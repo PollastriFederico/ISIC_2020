@@ -18,43 +18,12 @@ mean: tensor([0.6681, 0.5301, 0.5247]) | std: tensor([0.1337, 0.1480, 0.1595])
 class ISIC(data.Dataset):
     """ ISIC Dataset. """
     # data_root="/home/jmaronasm/ISIC_challenge_2019/Task_3/"
-    data_root = '/nas/softechict-nas-2/fpollastri/data/ISIC_dataset/Task_3/'
+    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC/'
 
     splitsdic = {
-        'inference': data_root + "inference.csv",
-        'training_2018': data_root + "ISIC2018_Task3_Training_GroundTruth.csv",
-        'test_2018': data_root + "task3_test.csv",
-        'training_2019': data_root + "ISIC_2019_Training_GroundTruth.csv",
-        'training_p1_2019': data_root + "2k19_train_partition1.csv",
-        'training_p2_2019': data_root + "2k19_train_partition2.csv",
-        'training_p3_2019': data_root + "2k19_train_partition3.csv",
-        'training_p4_2019': data_root + "2k19_train_partition4.csv",
-        'training_p5_2019': data_root + "2k19_train_partition5.csv",
-        'test_p1_2019': data_root + "2k19_test_partition1.csv",
-        'test_p2_2019': data_root + "2k19_test_partition2.csv",
-        'test_p3_2019': data_root + "2k19_test_partition3.csv",
-        'test_p4_2019': data_root + "2k19_test_partition4.csv",
-        'test_p5_2019': data_root + "2k19_test_partition5.csv",
-        'training_v1_2019': data_root + "2k19_train_partitionv1.csv",
-        'val_v1_2019': data_root + "2k19_validation_partitionv1.csv",
-        'test_v1_2019': data_root + "2k19_test_partitionv1.csv",
-        'submission_training_p1_2019': data_root + "2k19_submission_train_partition_1.csv",
-        'submission_training_p2_2019': data_root + "2k19_submission_train_partition_2.csv",
-        'submission_training_p3_2019': data_root + "2k19_submission_train_partition_3.csv",
-        'submission_training_p4_2019': data_root + "2k19_submission_train_partition_4.csv",
-        'submission_training_p5_2019': data_root + "2k19_submission_train_partition_5.csv",
-        'submission_training_p6_2019': data_root + "2k19_submission_train_partition_6.csv",
-        'submission_training_p7_2019': data_root + "2k19_submission_train_partition_7.csv",
-        'submission_validation_p1_2019': data_root + "2k19_submission_validation_partition_1.csv",
-        'submission_validation_p2_2019': data_root + "2k19_submission_validation_partition_2.csv",
-        'submission_validation_p3_2019': data_root + "2k19_submission_validation_partition_3.csv",
-        'submission_validation_p4_2019': data_root + "2k19_submission_validation_partition_4.csv",
-        'submission_validation_p5_2019': data_root + "2k19_submission_validation_partition_5.csv",
-        'submission_validation_p6_2019': data_root + "2k19_submission_validation_partition_6.csv",
-        'submission_validation_p7_2019': data_root + "2k19_submission_validation_partition_7.csv",
-        'training_v1_2019_10k': data_root + "2k19_partitionv1_trainingset_10k.csv",
-        'training_v1_2019_5k': data_root + "2k19_partitionv1_trainingset_5k.csv",
-        'training_v1_2019_1k': data_root + "2k19_partitionv1_trainingset_1k.csv",
+        'training_v1_2020': data_root + "2k20_train_partition.csv",
+        'test_v1_2020': data_root + "2k20_validation_partition.csv",
+        'val_v1_2020': data_root + "2k20_test_partition.csv",
     }
 
     def __init__(self, split_list=None, split_name='training_2019', classes=[[0, 1, 2, 3, 4, 5, 6, 7]], load=False,
@@ -114,20 +83,10 @@ class ISIC(data.Dataset):
         with open(fname) as csvfile:
             readCSV = csv.reader(csvfile, delimiter=',')
             for row in readCSV:
-                if row[0] == 'image':
+                if row[0] == 'image_name':
                     continue
-                if len(row) > 1:
-                    for i in range(len(row) - 1):
-                        if row[1 + i] == '1.0' or row[1 + i] == '1':
-                            for c_i, c in enumerate(self.classes):
-                                if i in c:
-                                    split_list.append(row[0])
-                                    labels_list.append(c_i)
-                                    break
-                            break
-                else:
-                    split_list.append(row[0])
-                    labels_list.append(0)
+                split_list.append(row[0])
+                labels_list.append(int(row[7]))
         self.split_list = split_list
         self.lbls = labels_list
         return split_list, labels_list

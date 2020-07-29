@@ -336,7 +336,7 @@ def plot(img):
     plt.show(block=False)
 
 
-def get_dataset(dname='isic2019', dataset_classes=[[0], [1]], size=512, SRV=False,
+def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=False,
                 batch_size=16, n_workers=0, augm_config=0, cutout_params=[[0], [0]], drop_last_flag=False):
     dataset = None
     test_dataset = None
@@ -344,7 +344,7 @@ def get_dataset(dname='isic2019', dataset_classes=[[0], [1]], size=512, SRV=Fals
     imgaug_transforms = ImgAugTransform(config_code=augm_config, size=size, SRV=SRV)
     inference_imgaug_transforms = ImgAugTransform(config_code=-1, size=size, SRV=SRV)
     if dname == 'isic2020':
-        training_split_name = 'training_v1_2019'
+        training_split_name = 'training_v1_2020'
         training_transforms = transforms.Compose([
             imgaug_transforms,
             transforms.ToTensor(),
@@ -352,14 +352,14 @@ def get_dataset(dname='isic2019', dataset_classes=[[0], [1]], size=512, SRV=Fals
             CutOut(*cutout_params)
         ])
 
-        test_split_name = 'test_v1_2019'
+        test_split_name = 'test_v1_2020'
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
             transforms.ToTensor(),
             transforms.Normalize((0.6681, 0.5301, 0.5247), (0.1337, 0.1480, 0.1595)),
         ])
 
-        valid_split_name = 'val_v1_2019'
+        valid_split_name = 'val_v1_2020'
         valid_transforms = test_transforms
     else:
         print("WRONG DATASET NAME")
