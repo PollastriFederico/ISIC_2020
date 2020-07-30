@@ -365,12 +365,12 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         print("WRONG DATASET NAME")
         raise Exception("WRONG DATASET NAME")
 
-    dataset = isic.ISIC(split_name=training_split_name, classes=dataset_classes, load=False, size=(size, size),
-                        transform=training_transforms)
-    test_dataset = isic.ISIC(split_name=test_split_name, classes=dataset_classes, load=False, size=(size, size),
-                             transform=test_transforms)
-    valid_dataset = isic.ISIC(split_name=valid_split_name, classes=dataset_classes, load=False, size=(size, size),
-                              transform=valid_transforms)
+    dataset = isic.ISIC(split_name=training_split_name, classes=dataset_classes, size=(size, size),
+                        transform=training_transforms, workers=n_workers)
+    test_dataset = isic.ISIC(split_name=test_split_name, classes=dataset_classes, size=(size, size),
+                             transform=test_transforms, workers=n_workers)
+    valid_dataset = isic.ISIC(split_name=valid_split_name, classes=dataset_classes, size=(size, size),
+                              transform=valid_transforms, workers=n_workers)
 
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,

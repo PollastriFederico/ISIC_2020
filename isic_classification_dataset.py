@@ -3,8 +3,11 @@ from PIL import Image
 import csv
 
 import time
+import os
 
 import torch.utils.data as data
+
+from single_file_dataset import Sfd
 
 '''
 STATS
@@ -22,20 +25,24 @@ class ISIC(data.Dataset):
 
     splitsdic = {
         'training_v1_2020': data_root + "2k20_train_partition.csv",
-        'test_v1_2020': data_root + "2k20_validation_partition.csv",
-        'val_v1_2020': data_root + "2k20_test_partition.csv",
+        'test_v1_2020': data_root + "2k20_test_partition.csv",
+        'val_v1_2020': data_root + "2k20_validation_partition.csv",
     }
 
-    def __init__(self, split_list=None, split_name='training_v1_2020', classes=[[0], [1]], load=False,
-                 size=(512, 512), segmentation_transform=None, transform=None, target_transform=None):
+    sfddic = {
+        'training_v1_2020': data_root + "train.sfd",
+        'test_v1_2020': data_root + "test.sfd",
+        'val_v1_2020': data_root + "val.sfd",
+    }
+
+    def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
+                 transform=None, workers=0):
         start_time = time.time()
-        self.segmentation_transform = segmentation_transform
         self.transform = transform
-        self.target_transform = target_transform
-        self.split_list = split_list
-        self.load = load
+        self.split_list = None
         self.size = size
         self.split_name = split_name
+        self.workers = workers
         if len(classes) == 1:
             self.classes = [[c] for c in classes[0]]
         else:
@@ -44,11 +51,7 @@ class ISIC(data.Dataset):
         print('loading ' + split_name)
         # self.split_list, self.lbls = self.read_csv(split_name)
         self.read_dataset()
-        if load:
-            print("LOADING " + str(len(self.split_list)) + " images in MEMORY")
-            self.imgs = self.get_images(self.split_list, self.size)
-        else:
-            self.imgs = self.get_names(self.split_list)
+        self.images = Sfd(self.sfddic[self.split_name], workers=self.workers)
 
         print("Time: " + str(time.time() - start_time))
 
@@ -61,16 +64,12 @@ class ISIC(data.Dataset):
             tuple: (image, ground)
         """
 
-        if not self.load:
-            image = Image.open(self.imgs[index])
-
-        else:
-            image = self.imgs[index]
+        image = self.images[index]
 
         if self.transform is not None:
             image = self.transform(image)
 
-        return image, self.lbls[index], self.imgs[index]
+        return image, self.lbls[index], self.split_list[index]
 
     def __len__(self):
         return len(self.split_list)
