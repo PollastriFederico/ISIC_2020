@@ -415,10 +415,9 @@ def get_model_wsegm(net, pretrained, num_classes, dropout, size):
         raise Warning("Wrong Net Name!!")
 
 
-def get_criterion(lossname, dataset_classes=[[0], [1], [2], [3], [4], [5], [6], [7]]):
+def get_criterion(lossname, dataset_classes=[[0], [1]]):
     # Defining the loss
-    whole_training_stats = [0.173232994, 0.522600954, 0.126555506, 0.032807043, 0.104471005, 0.008066499, 0.008755103,
-                            0.023510895]
+    whole_training_stats = [1 - 0.0176291, 0.0176291]
     training_stats = []
     for c in dataset_classes:
         training_stats.append(np.sum([whole_training_stats[c_i] for c_i in c]))

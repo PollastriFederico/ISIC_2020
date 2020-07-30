@@ -13,7 +13,7 @@ import io
 from pathlib import Path
 from yaml import CLoader as Loader
 from torch.utils import data
-
+import csv
 
 
 # Single File Dataset (.sfd) format
@@ -83,33 +83,48 @@ class Sfd:
                     image_data = img_f.read()
                     out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
                     out_f.write(image_data)
-                    print(f'\r{i + 1}/{len(img_list)}', end=' ')
+                    if i % 10 == 0:
+                        print(f'\r{i + 1}/{len(img_list)}', end=' ')
 
 
 # def create_isic_2020():
-    # from isic_classification_dataset import ISIC
+# from isic_classification_dataset import ISIC
 
-    # data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
-    #
-    # isic_train = ISIC(split_name='training_v1_2020', classes=[[0], [1]])
-    # Sfd.create(os.path.join(data_root, 'train.sfd'), isic_train.imgs)
-    #
-    # isic_val = ISIC(split_name='val_v1_2020', classes=[[0], [1]])
-    # Sfd.create(os.path.join(data_root, 'val.sfd'), isic_val.imgs)
-    #
-    # isic_test = ISIC(split_name='test_v1_2020', classes=[[0], [1]])
-    # Sfd.create(os.path.join(data_root, 'test.sfd'), isic_test.imgs)
+# data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+#
+# isic_train = ISIC(split_name='training_v1_2020', classes=[[0], [1]])
+# Sfd.create(os.path.join(data_root, 'train.sfd'), isic_train.imgs)
+#
+# isic_val = ISIC(split_name='val_v1_2020', classes=[[0], [1]])
+# Sfd.create(os.path.join(data_root, 'val.sfd'), isic_val.imgs)
+#
+# isic_test = ISIC(split_name='test_v1_2020', classes=[[0], [1]])
+# Sfd.create(os.path.join(data_root, 'test.sfd'), isic_test.imgs)
+
+def create_isic2020_test_sfd():
+    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+
+    img_list = []
+    with open(os.path.join(data_root, 'test.csv'), 'r') as csvfile:
+        readCSV = csv.reader(csvfile, delimiter=',')
+        for row in readCSV:
+            if row[0] == 'image_name':
+                continue
+            img_list.append(row[0] + '.jpg')
+
+    Sfd.create(filename=os.path.join(data_root, 'submission_test.sfd'),
+               img_list=img_list,
+               img_root=os.path.join(data_root, 'images'))
 
 
 if __name__ == '__main__':
+    create_isic2020_test_sfd()
 
     img_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
 
     sfd = Sfd(os.path.join(img_root, 'train.sfd'))
     img = sfd[0]
     img.show()
-
-
 
     # create_isic_2020()
 
