@@ -26,7 +26,7 @@ class ISIC(data.Dataset):
         'val_v1_2020': data_root + "2k20_test_partition.csv",
     }
 
-    def __init__(self, split_list=None, split_name='training_2019', classes=[[0, 1, 2, 3, 4, 5, 6, 7]], load=False,
+    def __init__(self, split_list=None, split_name='training_v1_2020', classes=[[0], [1]], load=False,
                  size=(512, 512), segmentation_transform=None, transform=None, target_transform=None):
         start_time = time.time()
         self.segmentation_transform = segmentation_transform

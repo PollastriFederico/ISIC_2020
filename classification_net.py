@@ -27,7 +27,7 @@ class ClassifyNet:
         self.dropout = dropout
         self.dname = dname
         if classes is None:
-            self.classes = [[0], [1], [2], [3], [4], [5], [6], [7]]
+            self.classes = [[0], [1]]
         elif len(classes) == 1:
             self.classes = [[c] for c in classes[0]]
         else:
