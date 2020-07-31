@@ -337,7 +337,8 @@ def plot(img):
 
 
 def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=False,
-                batch_size=16, n_workers=0, augm_config=0, cutout_params=[[0], [0]], drop_last_flag=False):
+                batch_size=16, n_workers=0, augm_config=0, cutout_params=[[0], [0]], drop_last_flag=False,
+                copy_into_tmp=False):
     dataset = None
     test_dataset = None
     valid_dataset = None
@@ -379,11 +380,11 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         raise Exception("WRONG DATASET NAME")
 
     dataset = isic.ISIC(split_name=training_split_name, classes=dataset_classes, size=(size, size),
-                        transform=training_transforms, workers=n_workers)
+                        transform=training_transforms, workers=n_workers, copy_into_tmp=copy_into_tmp)
     test_dataset = isic.ISIC(split_name=test_split_name, classes=dataset_classes, size=(size, size),
-                             transform=test_transforms, workers=n_workers)
+                             transform=test_transforms, workers=n_workers, copy_into_tmp=copy_into_tmp)
     valid_dataset = isic.ISIC(split_name=valid_split_name, classes=dataset_classes, size=(size, size),
-                              transform=valid_transforms, workers=n_workers)
+                              transform=valid_transforms, workers=n_workers, copy_into_tmp=copy_into_tmp)
 
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,

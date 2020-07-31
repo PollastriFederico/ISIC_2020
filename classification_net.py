@@ -15,13 +15,14 @@ import numpy as np
 from model import get_model, get_criterion, get_optimizer, get_scheduler, TemperatureScaling
 from data import get_dataset, CutOut
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
+from utils_metrics import compute_accuracy_metrics
 
 
 class ClassifyNet:
     def __init__(self, net, dname, dropout, l_r, loss, optimizer, scheduler, size, batch_size, n_workers, augm_config,
                  save_dir, mixup_coeff, cutout_params, total_epochs, SRV,
                  classes=[[0], [1]], pretrained=True, no_logs=False,
-                 optimize_temp_scal=False, drop_last=True):
+                 optimize_temp_scal=False, drop_last=True, copy_into_tmp=False):
         # Hyper-parameters
         self.net = net
         self.dropout = dropout
@@ -43,13 +44,14 @@ class ClassifyNet:
         self.augm_config = augm_config
         self.pretrained = pretrained
         self.save_dir = save_dir
-        self.best_acc = 0.0
+        self.best_auc = 0.0
         self.mixup_coeff = mixup_coeff
         self.cutout_nholes = cutout_params[0]
         self.cutout_pad_size = cutout_params[1]
         self.SRV = SRV
         self.no_logs = no_logs
         self.optimize_temp_scal = optimize_temp_scal
+        self.copy_into_tmp = copy_into_tmp
 
         self.nname = self.net + '_ISIC2019'
         if self.dropout:
@@ -69,9 +71,10 @@ class ClassifyNet:
                                                                                       n_workers=self.n_workers,
                                                                                       augm_config=self.augm_config,
                                                                                       cutout_params=cutout_params,
-                                                                                      drop_last_flag=drop_last)
+                                                                                      drop_last_flag=drop_last,
+                                                                                      copy_into_tmp=self.copy_into_tmp)
 
-        self.criterion = get_criterion(self.lossname, [[0], [1]])   # self.classes
+        self.criterion = get_criterion(self.lossname, [[0], [1]])  # self.classes
         self.optimizer = get_optimizer(self.n, self.learning_rate, self.optname)
         self.scheduler = get_scheduler(self.optimizer, self.schedname)
 
@@ -247,137 +250,39 @@ def train(class_model, num_epochs, starting_e=0):
             loss.backward()
             class_model.optimizer.step()
 
-        acc_valid, w_acc_valid, calibration_statistics, conf_matrix_valid, _ = eval(class_model,
-                                                                                    class_model.valid_data_loader,
-                                                                                    *class_model.calibration_variables[
-                                                                                        1],
-                                                                                    class_model.optimize_temp_scal)
+        acc_valid, w_acc_valid, conf_matrix_valid, acc_1_valid, pr_valid, rec_valid, fscore_valid, auc_valid, _, _ = eval(
+            class_model,
+            class_model.valid_data_loader,
+            *class_model.calibration_variables[
+                1],
+            class_model.optimize_temp_scal)
 
-        _, preds, true_lab = calibration_statistics
-        ECE_valid, MCE_valid, BRIER_valid, NNL_valid = compute_calibration_measures(preds, true_lab,
-                                                                                    apply_softmax=False, bins=15)
-
-        acc_test, w_acc_test, calibration_statistics, conf_matrix_test, _ = eval(class_model,
-                                                                                 class_model.test_data_loader,
-                                                                                 *class_model.calibration_variables[2],
-                                                                                 class_model.optimize_temp_scal)
-
-        _, preds, true_lab = calibration_statistics
-        ECE_test, MCE_test, BRIER_test, NNL_test = compute_calibration_measures(preds, true_lab, apply_softmax=False,
-                                                                                bins=15)
-
-        class_model.logger.info("\n|| Epoch {} took {:.1f} minutes \t LossCE {:.5f} \n"
-                                "| Accuracy statistics: weighted Acc valid: {:.3f}  weighted Acc test: {:.3f} Acc valid: {:.3f}  Acc test: {:.3f} \n"
-                                "| Calibration valid: ECE: {:.5f} MCE: {:.3f} BRIER: {:.3f} NNL: {:.5f} \n"
-                                "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".format(
-            epoch, (time.time() - start_time) / 60., np.mean(losses), w_acc_valid, w_acc_test, acc_valid,
-            acc_test, ECE_valid * 100., MCE_valid * 100., BRIER_valid, NNL_valid,
-                   ECE_test * 100., MCE_test * 100., BRIER_test, NNL_test))
+        acc_test, w_acc_test, conf_matrix_test, acc_1_test, pr_test, rec_test, fscore_test, auc_test, _, _ = eval(class_model,
+                                                                                                            class_model.test_data_loader,
+                                                                                                            *
+                                                                                                            class_model.calibration_variables[
+                                                                                                                2],
+                                                                                                            class_model.optimize_temp_scal)
 
         print("\n|| Epoch {} took {:.1f} minutes \t LossCE {:.5f} \n"
               "| Accuracy statistics: weighted Acc valid: {:.3f}  weighted Acc test: {:.3f} Acc valid: {:.3f}  Acc test: {:.3f} \n"
-              "| Calibration valid: ECE: {:.5f} MCE: {:.3f} BRIER: {:.3f} NNL: {:.5f} \n"
-              "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".format(epoch, (
-                time.time() - start_time) / 60., np.mean(losses), w_acc_valid, w_acc_test, acc_valid,
-                                                                                                  acc_test,
-                                                                                                  ECE_valid * 100.,
-                                                                                                  MCE_valid * 100.,
-                                                                                                  BRIER_valid,
-                                                                                                  NNL_valid,
-                                                                                                  ECE_test * 100.,
-                                                                                                  MCE_test * 100.,
-                                                                                                  BRIER_test, NNL_test))
+              "| Acc_1 valid: {:.3f} Pr valid: {:.3f} Rec valid: {:.3f} Fscore valid: {:.3f} Auc valid: {:.3f}\n"
+              "| Acc_1 test: {:.3f} Pr test: {:.3f} Rec test: {:.3f} Fscore test: {:.3f} Auc test: {:.3f}\n".format(
+            epoch, (time.time() - start_time) / 60., np.mean(losses), w_acc_valid, w_acc_test, acc_valid, acc_test,
+            acc_1_valid, pr_valid, rec_valid, fscore_valid, auc_valid, acc_1_test, pr_test, rec_test, fscore_test,
+            auc_test ))
 
         print(conf_matrix_valid)
         print('\n')
         print(conf_matrix_test)
 
-        if (w_acc_valid > class_model.best_acc or epoch % 20 == 0) and epoch > 20:
+        if (auc_valid > class_model.best_auc or epoch % 10 == 0) and epoch > 20:
             print("SAVING MODEL")
             class_model.save(epoch)
-            class_model.best_acc = w_acc_valid
+            class_model.best_auc = auc_valid
 
         if class_model.schedname == 'plateau':
-            class_model.scheduler.step(w_acc_valid)
-
-
-def train_with_mixup(class_model, num_epochs):
-    for epoch in range(num_epochs):
-
-        class_model.n.train()
-        losses = []
-        start_time = time.time()
-        losses = 0.0
-
-        for idx, ((x1, target1, _), (x2, target2, _)) in enumerate(zip(*class_model.data_loader)):
-            x1, x2, target1, target2 = x1.to('cuda'), x2.to('cuda'), target1.to('cuda').long(), target2.to(
-                'cuda').long()
-
-            lam = np.random.beta(class_model.mixup_coeff, class_model.mixup_coeff)
-            x = lam * x1 + (1. - lam) * x2
-
-            out = class_model.n(x)
-
-            loss = lam * class_model.criterion(out, target1) + (1. - lam) * class_model.criterion(out, target2)
-            losses += loss.data
-
-            # compute gradient and do SGD step
-            class_model.optimizer.zero_grad()
-            loss.backward()
-            class_model.optimizer.step()
-
-        acc_valid, w_acc_valid, calibration_statistics, conf_matrix_valid, _ = eval(class_model,
-                                                                                    class_model.valid_data_loader,
-                                                                                    *class_model.calibration_variables[
-                                                                                        1],
-                                                                                    class_model.optimize_temp_scal)
-
-        _, preds, true_lab = calibration_statistics
-        ECE_valid, MCE_valid, BRIER_valid, NNL_valid = compute_calibration_measures(preds, true_lab,
-                                                                                    apply_softmax=False, bins=15)
-
-        acc_test, w_acc_test, calibration_statistics, conf_matrix_test, _ = eval(class_model,
-                                                                                 class_model.test_data_loader,
-                                                                                 *class_model.calibration_variables[2],
-                                                                                 class_model.optimize_temp_scal)
-
-        _, preds, true_lab = calibration_statistics
-        ECE_test, MCE_test, BRIER_test, NNL_test = compute_calibration_measures(preds, true_lab, apply_softmax=False,
-                                                                                bins=15)
-
-        class_model.logger.info("\n|| Epoch {} took {:.1f} minutes \t LossCE {:.5f} \n"
-                                "| Accuracy statistics: weighted Acc valid: {:.3f}  weighted Acc test: {:.3f} Acc valid: {:.3f}  Acc test: {:.3f} \n"
-                                "| Calibration valid: ECE: {:.5f} MCE: {:.3f} BRIER: {:.3f} NNL: {:.5f} \n"
-                                "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".format(
-            epoch, (time.time() - start_time) / 60., losses / (float(idx + 1)), w_acc_valid, w_acc_test, acc_valid,
-            acc_test, ECE_valid * 100, MCE_valid * 100, BRIER_valid, NNL_valid,
-                   ECE_test * 100, MCE_test * 100, BRIER_test, NNL_test))
-
-        print("\n|| Epoch {} took {:.1f} minutes \t LossCE {:.5f} \n"
-              "| Accuracy statistics: weighted Acc valid: {:.3f}  weighted Acc test: {:.3f} Acc valid: {:.3f}  Acc test: {:.3f} \n"
-              "| Calibration valid: ECE: {:.5f} MCE: {:.3f} BRIER: {:.3f} NNL: {:.5f} \n"
-              "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".format(epoch, (
-                time.time() - start_time) / 60., losses / (float(idx + 1)), w_acc_valid, w_acc_test, acc_valid,
-                                                                                                  acc_test,
-                                                                                                  ECE_valid * 100,
-                                                                                                  MCE_valid * 100,
-                                                                                                  BRIER_valid,
-                                                                                                  NNL_valid,
-                                                                                                  ECE_test * 100,
-                                                                                                  MCE_test * 100,
-                                                                                                  BRIER_test, NNL_test))
-
-        print(conf_matrix_valid)
-        print('\n')
-        print(conf_matrix_test)
-
-        if w_acc_valid > class_model.best_acc:
-            print("SAVING MODEL")
-            class_model.save(epoch)
-            class_model.best_acc = w_acc_valid
-
-        if class_model.schedname == 'plateau':
-            class_model.scheduler.step(w_acc_valid)
+            class_model.scheduler.step(auc_valid)
 
 
 def eval(class_model, e_loader, predictions, labels, with_temp_scal=False, compute_separate_metrics_for_errors=False):
@@ -481,12 +386,14 @@ def eval(class_model, e_loader, predictions, labels, with_temp_scal=False, compu
 
         acc, w_acc = conf_matrix.get_metrics()
 
-        return acc, w_acc, [entropy_of_predictions, predictions, labels], conf_matrix.conf_matrix, per_samples_stats
+        acc_1, pr, rec, fscore, auc = compute_accuracy_metrics(predictions, labels)
+
+        return acc, w_acc, conf_matrix.conf_matrix, acc_1, pr, rec, fscore, auc, predictions, labels
 
 
 def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
     acc_test = 0
-    w_acc_test = 0
+    auc_test = 0
     ens_preds = torch.zeros_like(class_model.calibration_variables[2][0])
 
     start_time = time.time()
@@ -501,15 +408,14 @@ def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
     data_loader, test_data_loader, valid_data_loader = class_model.data_loader, class_model.test_data_loader, class_model.valid_data_loader
 
     for i in range(1, n_iter + 1):
-        acc_test_temp, w_acc_test_temp, calibration_statistics, conf_matrix_temp, _ = \
+        acc_test_temp, w_acc_test_temp, conf_matrix_test_temp, acc_1_test_temp, pr_test_temp, rec_test_temp, fscore_test_temp, auc_test_temp, preds, true_lab = \
             eval(class_model, test_data_loader, *class_model.calibration_variables[2], with_temp_scal)
         # print('iteration ' + str(i) + ' completed in ' + str(time.time()-start_time) + ' seconds')
         # print('Acc: ' + str(acc_test_temp) + ' | Weighted Acc: ' + str(w_acc_test_temp) + '\n')
         # print(conf_matrix_temp)
         acc_test += acc_test_temp
-        w_acc_test += w_acc_test_temp
+        auc_test += auc_test_temp
 
-        _, preds, true_lab = calibration_statistics
         ens_preds += preds
 
     conf_matrix_test = ConfusionMatrix(class_model.num_classes)
@@ -522,62 +428,11 @@ def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
                                                                             apply_softmax=False,
                                                                             bins=15)
     print("\n|| took {:.1f} minutes \n"
-          "| Mean Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Ensemble Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".
-          format((time.time() - start_time) / 60., w_acc_test / i, acc_test / i, ens_w_acc, ens_acc,
-                 ECE_test * 100, MCE_test * 100, BRIER_test, NNL_test))
+          "| Mean Accuracy statistics: Acc test: {:.3f} AUC test: {:.3f} \n"
+          .format((time.time() - start_time) / 60., acc_test / i, auc_test / i))
     print(conf_matrix_test.conf_matrix)
 
     return ens_acc, ens_w_acc, (ens_preds / n_iter), true_lab
-
-
-def log_ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
-    acc_test = 0
-    w_acc_test = 0
-    ens_preds = torch.zeros_like(class_model.calibration_variables[2][0])
-
-    start_time = time.time()
-    # data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2019_testwaugm', size=class_model.size,
-    #                                                                SRV=class_model.SRV,
-    #                                                                batch_size=class_model.batch_size,
-    #                                                                n_workers=class_model.n_workers,
-    #                                                                augm_config=class_model.augm_config,
-    #                                                                cutout_params=[class_model.cutout_nholes,
-    #                                                                               class_model.cutout_pad_size])
-
-    data_loader, test_data_loader, valid_data_loader = class_model.data_loader, class_model.test_data_loader, class_model.valid_data_loader
-
-    for i in range(1, n_iter + 1):
-        acc_test_temp, w_acc_test_temp, calibration_statistics, conf_matrix_temp, _ = \
-            eval(class_model, test_data_loader, *class_model.calibration_variables[2], with_temp_scal)
-        # print('iteration ' + str(i) + ' completed in ' + str(time.time()-start_time) + ' seconds')
-        # print('Acc: ' + str(acc_test_temp) + ' | Weighted Acc: ' + str(w_acc_test_temp) + '\n')
-        # print(conf_matrix_temp)
-        acc_test += acc_test_temp
-        w_acc_test += w_acc_test_temp
-
-        _, preds, true_lab = calibration_statistics
-        ens_preds += np.log(preds)
-
-    conf_matrix_test = ConfusionMatrix(class_model.num_classes)
-    temp_ens_preds = np.exp(ens_preds)
-    check_output, res = torch.max(torch.tensor(temp_ens_preds, device='cuda'), 1)
-    conf_matrix_test.update_matrix(res, torch.tensor(true_lab, device='cuda'))
-
-    ens_acc, ens_w_acc = conf_matrix_test.get_metrics()
-    ECE_test, MCE_test, BRIER_test, NNL_test = compute_calibration_measures(temp_ens_preds, true_lab,
-                                                                            apply_softmax=False,
-                                                                            bins=15)
-    print("\n|| took {:.1f} minutes \n"
-          "| Mean Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Ensemble Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".
-          format((time.time() - start_time) / 60., w_acc_test / i, acc_test / i, ens_w_acc, ens_acc,
-                 ECE_test * 100, MCE_test * 100, BRIER_test, NNL_test))
-    print(conf_matrix_test.conf_matrix)
-
-    return ens_acc, ens_w_acc, temp_ens_preds, true_lab
 
 
 def train_temperature_scaling_decoupled(class_model, temp_scal_lr, temp_scal_epochs):
@@ -670,6 +525,7 @@ if __name__ == '__main__':
                         help='mixout coefficient. If 0 is provided no mixup is applied')
     parser.add_argument('--calibrated', action='store_true', help='Boolean flag for applying temperature scaling')
     parser.add_argument('--gpu_device', type=int, default=0, help='To select gpu device')
+    parser.add_argument('--copy_into_tmp', action='store_true', help='Boolean flag for copying dataset into /tmp')
 
     opt = parser.parse_args()
     print(opt)
@@ -680,20 +536,16 @@ if __name__ == '__main__':
                     size=opt.size, batch_size=opt.batch_size, n_workers=opt.workers, pretrained=(not opt.from_scratch),
                     augm_config=opt.augm_config, save_dir=opt.save_dir, mixup_coeff=opt.mixup,
                     cutout_params=[opt.cutout_holes, opt.cutout_pad], total_epochs=opt.epochs, SRV=opt.SRV,
-                    optimize_temp_scal=opt.calibrated)
+                    optimize_temp_scal=opt.calibrated, copy_into_tmp=opt.copy_into_tmp)
 
     if not opt.load_epoch == 0:
         n.load(opt.load_epoch)
-        acc, w_acc, calib, conf_matrix, _ = eval(n, n.test_data_loader, *n.calibration_variables[2], opt.calibrated)
-        print(acc)
-        print(w_acc)
+        acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, _, _ = eval(n, n.test_data_loader, *n.calibration_variables[2], opt.calibrated)
+        print(f'Acc: {acc} AUC: {auc}')
         print(conf_matrix)
-        # ensemble_aug_eval(100, n)
+        # # ensemble_aug_eval(100, n)
         # eval(n, n.valid_data_loader, *n.calibration_variables[1])
-    if opt.mixup == 0.0:
-        train(n, opt.epochs, opt.load_epoch)
-    else:
-        train_with_mixup(n, opt.epochs)
+
+    train(n, opt.epochs, opt.load_epoch)
     n.save(opt.epochs)
     # eval(n, n.test_data_loader, *n.calibration_variables[2])
-
