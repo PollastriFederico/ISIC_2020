@@ -71,7 +71,7 @@ class ClassifyNet:
                                                                                       cutout_params=cutout_params,
                                                                                       drop_last_flag=drop_last)
 
-        self.criterion = get_criterion(self.lossname, self.classes)
+        self.criterion = get_criterion(self.lossname, [[0], [1]])   # self.classes
         self.optimizer = get_optimizer(self.n, self.learning_rate, self.optname)
         self.scheduler = get_scheduler(self.optimizer, self.schedname)
 

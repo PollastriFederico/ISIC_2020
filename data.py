@@ -361,6 +361,19 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
 
         valid_split_name = 'val_v1_2020'
         valid_transforms = test_transforms
+    elif dname == 'isic2020_inference':
+        training_split_name = 'isic2020_testset'
+
+        test_split_name = 'isic2020_testset'
+        test_transforms = transforms.Compose([
+            inference_imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.6681, 0.5301, 0.5247), (0.1337, 0.1480, 0.1595)),
+        ])
+
+        valid_split_name = 'isic2020_testset'
+        valid_transforms = test_transforms
+        training_transforms = test_transforms
     else:
         print("WRONG DATASET NAME")
         raise Exception("WRONG DATASET NAME")
@@ -679,6 +692,6 @@ if __name__ == '__main__':
     #
     # find_stats(data_loader)
 
-    data_loader, _, _ = get_dataset(augm_config=16)
+    data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
     for stuff in data_loader:
         pass
