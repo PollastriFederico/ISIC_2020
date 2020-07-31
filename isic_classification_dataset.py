@@ -39,14 +39,14 @@ class ISIC(data.Dataset):
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
-                 transform=None, workers=0, tmp=False):
+                 transform=None, workers=0, copy_into_tmp=False):
         start_time = time.time()
         self.transform = transform
         self.split_list = None
         self.size = size
         self.split_name = split_name
         self.workers = workers
-        self.tmp = tmp
+        self.copy_into_tmp = copy_into_tmp
         self.dataset_path = os.path.join(self.data_root, self.sfddic[self.split_name])
         if len(classes) == 1:
             self.classes = [[c] for c in classes[0]]
@@ -57,8 +57,8 @@ class ISIC(data.Dataset):
         # self.split_list, self.lbls = self.read_csv(split_name)
         self.read_dataset()
 
-        if self.tmp:
-            self.copy_into_tmp()
+        if self.copy_into_tmp:
+            self.perform_copy_into_tmp()
 
         self.images = Sfd(self.dataset_path, workers=self.workers)
 
@@ -102,7 +102,7 @@ class ISIC(data.Dataset):
         self.lbls = labels_list
         return split_list, labels_list
 
-    def copy_into_tmp(self):
+    def perform_copy_into_tmp(self):
         dataset_path_tmp = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name]
         finished_path = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name] + '.finished'
 
@@ -111,13 +111,13 @@ class ISIC(data.Dataset):
             fd = os.open(dataset_path_tmp, os.O_CREAT | os.O_EXCL)
             os.close(fd)
             # file does not exist, copy it from nas
-            print('Copying dataset from nas...', end=' ')
+            print('Copying dataset from nas...', end='\n')
             shutil.copyfile(self.dataset_path, dataset_path_tmp)
             open(finished_path, 'w').close()
         except FileExistsError:
             # file exists, check if it is finished
             counter = 0
-            print('Waiting for another process to finish copying dataset from nas...', end=' ')
+            print('Waiting for another process to finish copying dataset from nas...', end='\n')
             while not os.path.exists(finished_path):
                 time.sleep(5)
                 counter += 1
