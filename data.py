@@ -348,7 +348,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         training_transforms = transforms.Compose([
             imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.6681, 0.5301, 0.5247), (0.1337, 0.1480, 0.1595)),
+            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
             CutOut(*cutout_params)
         ])
 
@@ -356,7 +356,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.6681, 0.5301, 0.5247), (0.1337, 0.1480, 0.1595)),
+            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
         ])
 
         valid_split_name = 'val_v1_2020'
@@ -368,7 +368,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.6681, 0.5301, 0.5247), (0.1337, 0.1480, 0.1595)),
+            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
         ])
 
         valid_split_name = 'isic2020_testset'
@@ -693,5 +693,6 @@ if __name__ == '__main__':
     # find_stats(data_loader)
 
     data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
-    for stuff in data_loader:
-        pass
+    find_stats(data_loader)
+    # for stuff in data_loader:
+    #     pass
