@@ -348,7 +348,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         training_transforms = transforms.Compose([
             imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
             CutOut(*cutout_params)
         ])
 
@@ -356,7 +356,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
         ])
 
         valid_split_name = 'val_v1_2020'
@@ -368,7 +368,7 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
             transforms.ToTensor(),
-            transforms.Normalize((0.8704, 0.5423, 0.2640), (0.8790, 0.8208, 0.7718)),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
         ])
 
         valid_split_name = 'isic2020_testset'
@@ -676,23 +676,23 @@ def draw_histogram(data_loader):
 
 if __name__ == '__main__':
 
-    # dataset = isic.ISIC(split_name='training_2019',  # classes=[[0, 1, 2, 3, 4, 5, 6]],
-    #                     load=False, size=(512, 512),
-    #                     transform=transforms.Compose([
-    #                         transforms.Resize((512, 512)),
-    #                         transforms.ToTensor(),
-    #                     ])
-    #                     )
-    # data_loader = DataLoader(dataset,
-    #                          batch_size=16,
-    #                          shuffle=False,
-    #                          num_workers=16,
-    #                          drop_last=False,
-    #                          pin_memory=True)
-    #
-    # find_stats(data_loader)
+    dataset = isic.ISIC(split_name='training_v1_2020',  # classes=[[0, 1, 2, 3, 4, 5, 6]],
+                        size=(512, 512),
+                        transform=transforms.Compose([
+                            transforms.Resize((512, 512)),
+                            transforms.ToTensor(),
+                        ]),
+                        workers=16
+                        )
+    data_loader = DataLoader(dataset,
+                             batch_size=16,
+                             shuffle=False,
+                             num_workers=16,
+                             drop_last=False,
+                             pin_memory=True)
 
-    data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
     find_stats(data_loader)
+
+    # data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
     # for stuff in data_loader:
     #     pass
