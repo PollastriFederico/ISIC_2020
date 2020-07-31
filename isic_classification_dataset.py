@@ -28,12 +28,14 @@ class ISIC(data.Dataset):
         'training_v1_2020': data_root + "2k20_train_partition.csv",
         'test_v1_2020': data_root + "2k20_test_partition.csv",
         'val_v1_2020': data_root + "2k20_validation_partition.csv",
+        'isic2020_testset': data_root + "test.csv",
     }
 
     sfddic = {
         'training_v1_2020': "train.sfd",
         'test_v1_2020': "test.sfd",
         'val_v1_2020': "val.sfd",
+        'isic2020_testset': "submission_test.sfd",
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
@@ -92,7 +94,10 @@ class ISIC(data.Dataset):
                 if row[0] == 'image_name':
                     continue
                 split_list.append(row[0])
-                labels_list.append(int(row[7]))
+                if len(row) == 8:
+                    labels_list.append(int(row[7]))
+                else:
+                    labels_list.append(0)
         self.split_list = split_list
         self.lbls = labels_list
         return split_list, labels_list

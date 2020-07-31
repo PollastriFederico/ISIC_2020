@@ -1,8 +1,16 @@
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import argparse
 import torch
 import time
 import numpy as np
-import os
+
 from classification_net import ClassifyNet, eval, ensemble_aug_eval, log_ensemble_aug_eval
 from utils import ConfusionMatrix, compute_calibration_measures
 
@@ -13,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('--avg', default=None, help='name of the file with ensemble parameters')
     parser.add_argument('--da_n_iter', type=int, default=0, help='number of iterations for Data Augmentation ensemble')
     parser.add_argument('--calibrated', action='store_true', help='Boolean flag for applying temperature scaling')
-    parser.add_argument('--dataset', default='isic2019', help='name of the dataset to use')
+    parser.add_argument('--dataset', default='isic2020_inference', help='name of the dataset to use')
     parser.add_argument('--validation', action='store_true', help='Boolean flag for using validation set')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size during the training')
     parser.add_argument('--log_ens', action='store_true', help='Boolean flag for ensembling through logarithms')
@@ -140,5 +148,5 @@ if __name__ == '__main__':
     if opt.validation:
         fname += "_validation"
 
-    np.savetxt("/nas/softechict-nas-1/fpollastri/isic_submission_output/output_" + fname + ".csv", temp_ens_preds, delimiter=",")
-    np.save("/nas/softechict-nas-1/fpollastri/isic_submission_output/output_" + fname + ".npy", temp_ens_preds)
+    np.savetxt("/nas/softechict-nas-1/sallegretti/isic_submission_output/output_" + fname + ".csv", temp_ens_preds, delimiter=",")
+    np.save("/nas/softechict-nas-1/sallegretti/isic_submission_output/output_" + fname + ".npy", temp_ens_preds)
