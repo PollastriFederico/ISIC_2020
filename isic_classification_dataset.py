@@ -16,6 +16,9 @@ STATS
 training_2019
 mean: tensor([0.6681, 0.5301, 0.5247]) | std: tensor([0.1337, 0.1480, 0.1595])
 
+training_2020
+training
+mean: tensor([0.8704, 0.5423, 0.2640]) | std: tensor([0.8790, 0.8208, 0.7718])
 '''
 
 
