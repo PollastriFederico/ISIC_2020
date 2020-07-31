@@ -4,6 +4,7 @@ import csv
 
 import time
 import os
+import shutil
 
 import torch.utils.data as data
 
@@ -30,19 +31,21 @@ class ISIC(data.Dataset):
     }
 
     sfddic = {
-        'training_v1_2020': data_root + "train.sfd",
-        'test_v1_2020': data_root + "test.sfd",
-        'val_v1_2020': data_root + "val.sfd",
+        'training_v1_2020': "train.sfd",
+        'test_v1_2020': "test.sfd",
+        'val_v1_2020': "val.sfd",
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
-                 transform=None, workers=0):
+                 transform=None, workers=0, tmp=False):
         start_time = time.time()
         self.transform = transform
         self.split_list = None
         self.size = size
         self.split_name = split_name
         self.workers = workers
+        self.tmp = tmp
+        self.dataset_path = os.path.join(self.data_root, self.sfddic[self.split_name])
         if len(classes) == 1:
             self.classes = [[c] for c in classes[0]]
         else:
@@ -51,7 +54,11 @@ class ISIC(data.Dataset):
         print('loading ' + split_name)
         # self.split_list, self.lbls = self.read_csv(split_name)
         self.read_dataset()
-        self.images = Sfd(self.sfddic[self.split_name], workers=self.workers)
+
+        if self.tmp:
+            self.copy_into_tmp()
+
+        self.images = Sfd(self.dataset_path, workers=self.workers)
 
         print("Time: " + str(time.time() - start_time))
 
@@ -89,6 +96,30 @@ class ISIC(data.Dataset):
         self.split_list = split_list
         self.lbls = labels_list
         return split_list, labels_list
+
+    def copy_into_tmp(self):
+        dataset_path_tmp = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name]
+        finished_path = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name] + '.finished'
+
+        # atomically create tmp file if it does not exists
+        try:
+            fd = os.open(dataset_path_tmp, os.O_CREAT | os.O_EXCL)
+            os.close(fd)
+            # file does not exist, copy it from nas
+            print('Copying dataset from nas...', end=' ')
+            shutil.copyfile(self.dataset_path, dataset_path_tmp)
+            open(finished_path, 'w').close()
+        except FileExistsError:
+            # file exists, check if it is finished
+            counter = 0
+            print('Waiting for another process to finish copying dataset from nas...', end=' ')
+            while not os.path.exists(finished_path):
+                time.sleep(5)
+                counter += 1
+                if counter > 200:
+                    raise Warning('Failure.')
+        print('Done.')
+        self.dataset_path = dataset_path_tmp
 
     @classmethod
     def get_names(cls, n_list):
