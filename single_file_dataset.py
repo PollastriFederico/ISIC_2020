@@ -62,7 +62,7 @@ class Sfd:
         [f.close() for f in self.files]
 
     @staticmethod
-    def create(filename, img_list, img_root=''):
+    def create(filename, img_list, img_root='', new_size=None):
         length = len(img_list)
 
         positions = np.empty([length], dtype=np.uint64)
@@ -79,13 +79,22 @@ class Sfd:
             out_f.write(length.to_bytes(4, 'little', signed=False))
             out_f.write(positions.tobytes())
             for i, img in enumerate(img_list):
-                with open(os.path.join(img_root, img), 'rb') as img_f:
-                    image_data = img_f.read()
-                    out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
-                    out_f.write(image_data)
-                    if i % 10 == 0:
-                        print(f'\r{i + 1}/{len(img_list)}', end=' ')
-
+                if not new_size:
+                    with open(os.path.join(img_root, img), 'rb') as img_f:
+                        image_data = img_f.read()
+                else:
+                    img = Image.open(os.path.join(img_root, img))
+                    width, height = img.size
+                    resize_factor = max(width, height) / new_size
+                    if resize_factor > 1:
+                        img = img.resize(size=(round(width / resize_factor), round(height / resize_factor)))
+                    img_byte_stream = io.BytesIO()
+                    img.save(img_byte_stream, format='JPEG')
+                    image_data = img_byte_stream.getvalue()
+                out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
+                out_f.write(image_data)
+                if i % 10 == 0:
+                    print(f'\r{i + 1}/{len(img_list)}', end=' ')
 
 # def create_isic_2020():
 # from isic_classification_dataset import ISIC
@@ -100,6 +109,7 @@ class Sfd:
 #
 # isic_test = ISIC(split_name='test_v1_2020', classes=[[0], [1]])
 # Sfd.create(os.path.join(data_root, 'test.sfd'), isic_test.imgs)
+
 
 def create_isic2020_test_sfd():
     data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
@@ -117,8 +127,33 @@ def create_isic2020_test_sfd():
                img_root=os.path.join(data_root, 'images'))
 
 
+def create_isic2020_sfd(new_size=None, prefix=''):
+    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+
+    csv_dict = {
+        '2k20_train_partition.csv': 'train.sfd',
+        '2k20_validation_partition.csv': 'val.sfd',
+        '2k20_test_partition.csv': 'test.sfd',
+    }
+
+    img_list = []
+    for key, value in csv_dict.items():
+        with open(os.path.join(data_root, key), 'r') as csvfile:
+            readCSV = csv.reader(csvfile, delimiter=',')
+            for row in readCSV:
+                if row[0] == 'image_name':
+                    continue
+                img_list.append(row[0] + '.jpg')
+
+        Sfd.create(filename=os.path.join(data_root, f'{prefix}{value}'),
+                   img_list=img_list,
+                   img_root=os.path.join(data_root, 'images'),
+                   new_size=new_size)
+
+
 if __name__ == '__main__':
-    create_isic2020_test_sfd()
+    #create_isic2020_test_sfd()
+    create_isic2020_sfd(new_size=1024, prefix='small')
 
     img_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
 
