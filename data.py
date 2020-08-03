@@ -11,7 +11,7 @@ import imgaug as ia
 import random
 import matplotlib.pyplot as plt
 from PIL import Image
-
+import time
 
 # Cutout Data Augmentation Class. Can be used in the torchvision compose pipelin
 class CutOut(object):
@@ -218,11 +218,16 @@ class ImgAugTransform:
     def __call__(self, img):
         self.aug.reseed(random.randint(1, 10000))
 
+        start_time = time.time()
         img = np.array(img)
+        print(f'Img to array time: {time.time() - start_time}')
+
+        start_time = time.time()
         img = ia.augmenters.PadToFixedSize(width=max(img.shape[0], img.shape[1]),
                                            height=max(img.shape[0], img.shape[1]),
                                            pad_mode=self.mode, position='center').augment_image(img)
         img = ia.augmenters.Resize({"width": self.size, "height": self.size}).augment_image(img)
+        print(f'Resize time: {time.time() - start_time}')
 
         if not self.SRV:
             plot(img)

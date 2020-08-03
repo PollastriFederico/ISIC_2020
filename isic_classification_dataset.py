@@ -42,7 +42,7 @@ class ISIC(data.Dataset):
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
-                 transform=None, workers=0, copy_into_tmp=False):
+                 transform=None, workers=0, copy_into_tmp=False, use_sfd=False,):
         start_time = time.time()
         self.transform = transform
         self.split_list = None
@@ -75,11 +75,13 @@ class ISIC(data.Dataset):
         Returns:
             tuple: (image, ground)
         """
-
+        #start_time = time.time()
         image = self.images[index]
-
+        #print(f'Get image time: {time.time() - start_time}')
         if self.transform is not None:
+            #start_time = time.time()
             image = self.transform(image)
+            #print(f'Get transform time: {time.time() - start_time}')
 
         return image, self.lbls[index], self.split_list[index]
 
