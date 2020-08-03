@@ -196,8 +196,8 @@ class ImgAugTransform:
             sometimes(ia.augmenters.CropAndPad(percent=(-0.2, 0.05), pad_mode=self.mode))  # 2048
         ]
         self.aug_list = [
-            # ia.augmenters.Fliplr(0.5),
-            # ia.augmenters.Flipud(0.5)
+            ia.augmenters.Fliplr(0.5),
+            ia.augmenters.Flipud(0.5)
         ]
 
         # FIRST "BIT" OF CONFIG CODE IS THE PADDING MODE, FIRST LOOP IS A DUMMY
@@ -208,7 +208,7 @@ class ImgAugTransform:
             if not cc:
                 break
 
-        # self.aug_list.append(ia.augmenters.Affine(rotate=(-180, 180), mode=self.mode))
+        self.aug_list.append(ia.augmenters.Affine(rotate=(-180, 180), mode=self.mode))
         self.aug = ia.augmenters.Sequential(self.aug_list)
         if self.config >= 0:
             print(self.mode)
@@ -325,12 +325,12 @@ class ImgAugTransformwSegm:
 
 counter = 0
 def plot(img):
-    return
-    global counter
-    im = Image.fromarray(img)
-    im.save(f'/nas/softechict-nas-2/fpollastri/gaussian_blur_images/img_{counter}.png')
-    counter += 1
-    return
+    # return
+    # global counter
+    # im = Image.fromarray(img)
+    # im.save(f'/nas/softechict-nas-2/fpollastri/gaussian_blur_images/img_{counter}.png')
+    # counter += 1
+    # return
     plt.figure()
     plt.imshow(img)
     plt.show(block=False)
