@@ -233,7 +233,7 @@ class ClassifyNet:
 
 
 def train(class_model, num_epochs, starting_e=0):
-    writer = SummaryWriter(log_dir='/nas/softechict-nas-1/sallegretti/tensorboard')
+    writer = SummaryWriter(log_dir='/nas/softechict-nas-1/fpollastri/tensorboard')
 
     for epoch in range(starting_e + 1, num_epochs):
         class_model.n.train()
@@ -241,8 +241,8 @@ def train(class_model, num_epochs, starting_e=0):
         start_time = time.time()
         for idx, (x, target, _) in enumerate(class_model.data_loader):
             # measure data loading time
-            #print("data time: " + str(time.time() - start_time))
-            #start_time = time.time()
+            # print("data time: " + str(time.time() - start_time))
+            # start_time = time.time()
             # compute output
             x = x.to('cuda')
             target = target.to('cuda', torch.long)
@@ -253,8 +253,8 @@ def train(class_model, num_epochs, starting_e=0):
             class_model.optimizer.zero_grad()
             loss.backward()
             class_model.optimizer.step()
-            #print("training time: " + str(time.time() - start_time))
-            #start_time = time.time()
+            # print("training time: " + str(time.time() - start_time))
+            # start_time = time.time()
 
         acc_valid, w_acc_valid, conf_matrix_valid, acc_1_valid, pr_valid, rec_valid, fscore_valid, auc_valid, _, _ = eval(
             class_model,

@@ -185,8 +185,8 @@ class ImgAugTransform:
             None,  # placeholder for future inclusion                                               # 2
             sometimes(ia.augmenters.AdditivePoissonNoise((0, 10), per_channel=True)),  # 4
             sometimes(ia.augmenters.Dropout((0, 0.02), per_channel=False)),  # 8
-            # sometimes(ia.augmenters.GaussianBlur((0, 0.8))),  # 16
-            sometimes(ia.augmenters.GaussianBlur(0.6)),  # 16
+            sometimes(ia.augmenters.GaussianBlur((0, 0.8))),  # 16
+            # sometimes(ia.augmenters.GaussianBlur(0.6)),  # 16
             sometimes(ia.augmenters.AddToHueAndSaturation((-20, 10))),  # 32
             sometimes(ia.augmenters.GammaContrast((0.5, 1.5))),  # 64
             None,  # placeholder for future inclusion                                               # 128
@@ -218,16 +218,19 @@ class ImgAugTransform:
     def __call__(self, img):
         self.aug.reseed(random.randint(1, 10000))
 
-        start_time = time.time()
+        # start_time = time.time()
         img = np.array(img)
-        print(f'Img to array time: {time.time() - start_time}')
+        # print(f'PIL to np array time: {time.time() - start_time}')
 
-        start_time = time.time()
+        # start_time = time.time()
         img = ia.augmenters.PadToFixedSize(width=max(img.shape[0], img.shape[1]),
                                            height=max(img.shape[0], img.shape[1]),
                                            pad_mode=self.mode, position='center').augment_image(img)
+        # print(f'Pad to fixed size time: {time.time() - start_time}')
+        # start_time = time.time()
+
         img = ia.augmenters.Resize({"width": self.size, "height": self.size}).augment_image(img)
-        print(f'Resize time: {time.time() - start_time}')
+        # print(f'Resize time: {time.time() - start_time}')
 
         if not self.SRV:
             plot(img)
