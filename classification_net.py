@@ -17,6 +17,8 @@ from data import get_dataset, CutOut
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
 from utils_metrics import compute_accuracy_metrics
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 class ClassifyNet:
     def __init__(self, net, dname, dropout, l_r, loss, optimizer, scheduler, size, batch_size, n_workers, augm_config,
@@ -231,14 +233,16 @@ class ClassifyNet:
 
 
 def train(class_model, num_epochs, starting_e=0):
+    writer = SummaryWriter(log_dir='/nas/softechict-nas-1/sallegretti/tensorboard')
+
     for epoch in range(starting_e + 1, num_epochs):
         class_model.n.train()
         losses = []
         start_time = time.time()
         for idx, (x, target, _) in enumerate(class_model.data_loader):
             # measure data loading time
-            # print("data time: " + str(time.time() - start_time))
-
+            print("data time: " + str(time.time() - start_time))
+            start_time = time.time()
             # compute output
             x = x.to('cuda')
             target = target.to('cuda', torch.long)
@@ -249,6 +253,8 @@ def train(class_model, num_epochs, starting_e=0):
             class_model.optimizer.zero_grad()
             loss.backward()
             class_model.optimizer.step()
+            print("training time: " + str(time.time() - start_time))
+            start_time = time.time()
 
         acc_valid, w_acc_valid, conf_matrix_valid, acc_1_valid, pr_valid, rec_valid, fscore_valid, auc_valid, _, _ = eval(
             class_model,
@@ -275,6 +281,14 @@ def train(class_model, num_epochs, starting_e=0):
         print(conf_matrix_valid)
         print('\n')
         print(conf_matrix_test)
+
+        writer.add_scalar('Loss', np.mean(losses), epoch)
+        writer.add_scalar('AUC/valid', auc_valid, epoch)
+        writer.add_scalar('AUC/test', auc_valid, epoch)
+        writer.add_scalar('Fscore/valid', fscore_valid, epoch)
+        writer.add_scalar('Fscore/test', fscore_test, epoch)
+        writer.add_scalar('Recall/valid', rec_valid, epoch)
+        writer.add_scalar('Recall/test', rec_test, epoch)
 
         if (auc_valid > class_model.best_auc or epoch % 10 == 0) and epoch > 20:
             print("SAVING MODEL")
