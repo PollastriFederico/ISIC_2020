@@ -14,7 +14,7 @@ from pathlib import Path
 from yaml import CLoader as Loader
 from torch.utils import data
 import csv
-
+import imgaug as ia
 
 # Single File Dataset (.sfd) format
 # All numbers are little endian
@@ -62,69 +62,117 @@ class Sfd:
         [f.close() for f in self.files]
 
     @staticmethod
-    def create(filename, img_list, img_root=''):
+    def create(filename, img_list, img_root='', transform=None):
+        '''
+
+        Args:
+            filename:
+            img_list:
+            img_root:
+            transform: callable that takes a PIL Image as input and outputs a "bytes" object
+
+        Returns:
+
+        '''
         length = len(img_list)
 
         positions = np.empty([length], dtype=np.uint64)
-        sizes = np.empty([length], dtype=np.uint64)
         cur_pos = 4 + 8 * length
-
-        for i, img in enumerate(img_list):
-            size = Path(os.path.join(img_root, img)).stat().st_size
-            positions[i] = cur_pos
-            sizes[i] = size
-            cur_pos += 4 + size
 
         with open(filename, 'wb') as out_f:
             out_f.write(length.to_bytes(4, 'little', signed=False))
             out_f.write(positions.tobytes())
             for i, img in enumerate(img_list):
-                with open(os.path.join(img_root, img), 'rb') as img_f:
-                    image_data = img_f.read()
-                    out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
-                    out_f.write(image_data)
-                    if i % 10 == 0:
-                        print(f'\r{i + 1}/{len(img_list)}', end=' ')
+                if not transform:
+                    with open(os.path.join(img_root, img), 'rb') as img_f:
+                        image_data = img_f.read()
+                else:
+                    img = Image.open(os.path.join(img_root, img))
+                    image_data = transform(img)
+                out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
+                out_f.write(image_data)
+
+                # update positions
+                positions[i] = cur_pos
+                cur_pos += 4 + len(image_data)
+
+                if i % 100 == 0 and i > 0:
+                    print(f'{i}/{len(img_list)}', end='\n')
+            print(f'{len(img_list)}/{len(img_list)}', end='\n')
+
+            # write positions list before the images list
+            out_f.seek(4, 0)
+            out_f.write(positions.tobytes())
 
 
-# def create_isic_2020():
-# from isic_classification_dataset import ISIC
+def image_to_bytes(img: Image):
+    img_byte_stream = io.BytesIO()
+    img.save(img_byte_stream, format='JPEG')
+    return img_byte_stream.getvalue()
 
-# data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
-#
-# isic_train = ISIC(split_name='training_v1_2020', classes=[[0], [1]])
-# Sfd.create(os.path.join(data_root, 'train.sfd'), isic_train.imgs)
-#
-# isic_val = ISIC(split_name='val_v1_2020', classes=[[0], [1]])
-# Sfd.create(os.path.join(data_root, 'val.sfd'), isic_val.imgs)
-#
-# isic_test = ISIC(split_name='test_v1_2020', classes=[[0], [1]])
-# Sfd.create(os.path.join(data_root, 'test.sfd'), isic_test.imgs)
 
-def create_isic2020_test_sfd():
+class ResizeTransform:
+
+    def __init__(self, size: int):
+        self.size = size
+
+    def __call__(self, img: Image):
+        width, height = img.size
+        resize_factor = max(width, height) / self.size
+        if resize_factor > 1:
+            img = img.resize(size=(round(width / resize_factor), round(height / resize_factor)))
+        return image_to_bytes(img)
+
+
+class ResizeSquaredTransform:
+
+    def __init__(self, size: int, pad_mode='reflect'):
+        self.size = size
+        self.pad_mode = pad_mode
+
+    def __call__(self, img: Image):
+        img = np.array(img)
+        img = ia.augmenters.PadToFixedSize(width=max(img.shape[0], img.shape[1]),
+                                           height=max(img.shape[0], img.shape[1]),
+                                           pad_mode=self.pad_mode, position='center').augment_image(img)
+        img = ia.augmenters.Resize({"width": self.size, "height": self.size}).augment_image(img)
+        return image_to_bytes(Image.fromarray(img))
+
+
+def create_isic2020_sfd(prefix='', transform=None):
     data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
 
-    img_list = []
-    with open(os.path.join(data_root, 'test.csv'), 'r') as csvfile:
-        readCSV = csv.reader(csvfile, delimiter=',')
-        for row in readCSV:
-            if row[0] == 'image_name':
-                continue
-            img_list.append(row[0] + '.jpg')
+    csv_dict = {
+        '2k20_validation_partition.csv': 'val.sfd',
+        '2k20_test_partition.csv': 'test.sfd',
+        '2k20_train_partition.csv': 'train.sfd',
+        'test.csv': 'submission_test.sfd',
+    }
 
-    Sfd.create(filename=os.path.join(data_root, 'submission_test.sfd'),
-               img_list=img_list,
-               img_root=os.path.join(data_root, 'images'))
+    for key, value in csv_dict.items():
+        img_list = []
+        with open(os.path.join(data_root, key), 'r') as csvfile:
+            readCSV = csv.reader(csvfile, delimiter=',')
+            for row in readCSV:
+                if row[0] == 'image_name':
+                    continue
+                img_list.append(row[0] + '.jpg')
+
+        Sfd.create(filename=os.path.join(data_root, f'{prefix}{value}'),
+                   img_list=img_list,
+                   img_root=os.path.join(data_root, 'images'),
+                   transform=transform)
 
 
 if __name__ == '__main__':
-    create_isic2020_test_sfd()
+    #create_isic2020_test_sfd()
+    #create_isic2020_sfd(prefix='512_squared_', transform=ResizeSquaredTransform(size=512, pad_mode='reflect'))
 
     img_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
-
-    sfd = Sfd(os.path.join(img_root, 'train.sfd'))
+    #
+    sfd = Sfd(os.path.join(img_root, '512_squared_val.sfd'))
     img = sfd[0]
-    img.show()
+    # img.show()
 
     # create_isic_2020()
 

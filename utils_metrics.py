@@ -13,6 +13,8 @@ def compute_accuracy_metrics(preds, gts):
     pr = tr_trues / (trues + 10e-5)
     rec = tr_trues / (g_trues + 10e-5)
     fscore = (2 * pr * rec) / (pr + rec + 10e-5)
-    auc = metrics.roc_auc_score(gts, preds[:, 1])
-
+    try:
+        auc = metrics.roc_auc_score(gts, preds[:, 1])
+    except ValueError:
+        auc = 0
     return acc, pr, rec, fscore, auc

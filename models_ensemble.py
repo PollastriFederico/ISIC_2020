@@ -10,8 +10,9 @@ import argparse
 import torch
 import time
 import numpy as np
+from utils_metrics import compute_accuracy_metrics
 
-from classification_net import ClassifyNet, eval, ensemble_aug_eval, log_ensemble_aug_eval
+from classification_net import ClassifyNet, eval, ensemble_aug_eval
 from utils import ConfusionMatrix, compute_calibration_measures
 
 if __name__ == '__main__':
@@ -32,6 +33,9 @@ if __name__ == '__main__':
         opt.dataset = 'isic2018_test_waugm'
     if opt.dataset == 'isic2019' and opt.da_n_iter != 0:
         opt.dataset = 'isic2019_testwaugm'
+    if opt.da_n_iter != 0:
+        opt.dataset += '_waugm'
+
 
     print(opt)
 
@@ -64,7 +68,7 @@ if __name__ == '__main__':
     ens_preds = None
     counter = 0.0
     w_acc_test = 0.0
-    acc_test = 0.0
+    auc_test = 0.0
     start_time = time.time()
     f = open(opt.avg, "r")
     for line in f:
@@ -91,52 +95,35 @@ if __name__ == '__main__':
             n.calibration_variables[2] = n.calibration_variables[1]
 
         if opt.da_n_iter != 0:
-            if opt.log_ens:
-                acc, w_acc, preds, true_lab = log_ensemble_aug_eval(opt.da_n_iter, n, opt.calibrated)
-            else:
-                acc, w_acc, preds, true_lab = ensemble_aug_eval(opt.da_n_iter, n, opt.calibrated)
+            acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, preds, true_lab = ensemble_aug_eval(opt.da_n_iter, n, opt.calibrated)
 
         else:
-            acc, w_acc, calib, conf_matrix, _ = eval(n, n.test_data_loader, *n.calibration_variables[2],
-                                                     opt.calibrated)
-            _, preds, true_lab = calib
+            acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, preds, true_lab = eval(n, n.test_data_loader,
+                                                                                         *n.calibration_variables[2],
+                                                                                            opt.calibrated)
 
-        acc_test += acc
+        auc_test += auc
         w_acc_test += w_acc
         if ens_preds is None:
-            if opt.log_ens:
-                ens_preds = np.log(preds)
-            else:
-                ens_preds = preds
-
+            ens_preds = preds
         else:
-            if opt.log_ens:
-                ens_preds += np.log(preds)
-            else:
-                ens_preds += preds
+            ens_preds += preds
 
     conf_matrix_test = ConfusionMatrix(n.num_classes)
-    if opt.log_ens:
-        temp_ens_preds = np.exp(ens_preds)
-    else:
-        temp_ens_preds = ens_preds / counter
+    temp_ens_preds = ens_preds / counter
 
     check_output, res = torch.max(torch.tensor(temp_ens_preds, device='cuda'), 1)
     conf_matrix_test.update_matrix(res, torch.tensor(true_lab, device='cuda'))
 
     ens_acc, ens_w_acc = conf_matrix_test.get_metrics()
-    ECE_test, MCE_test, BRIER_test, NNL_test = compute_calibration_measures(temp_ens_preds, true_lab,
-                                                                            apply_softmax=False,
-                                                                            bins=15)
+    ens_acc_1, pr, rec, fscore, auc = compute_accuracy_metrics(temp_ens_preds, true_lab)
 
     print("\n ----- FINAL PRINT ----- \n")
 
     print("\n|| took {:.1f} minutes \n"
-          "| Mean Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Ensemble Accuracy statistics: weighted Acc test: {:.3f} Acc test: {:.3f} \n"
-          "| Calibration test: ECE: {:.5f} MCE: {:.5f} BRIER: {:.5f}  NNL: {:.5f}\n\n".
-          format((time.time() - start_time) / 60., w_acc_test / counter, acc_test / counter, ens_w_acc, ens_acc,
-                 ECE_test * 100, MCE_test * 100, BRIER_test, NNL_test))
+          "| Mean Accuracy statistics: Weighted Acc: {:.3f} AUC: {:.3f} \n"
+          "| Ensemble Accuracy statistics: Weighted Acc: {:.3f} AUC: {:.3f} Recall: {:.3f} Precision: {:.3f} Fscore: {:.3f} \n"
+          .format((time.time() - start_time) / 60., w_acc_test / counter, auc_test / counter, ens_w_acc, auc, rec, pr, fscore))
     print(conf_matrix_test.conf_matrix)
 
     avgname = os.path.basename(opt.avg)

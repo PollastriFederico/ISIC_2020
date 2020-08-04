@@ -1,9 +1,16 @@
 from __future__ import print_function
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 from PIL import Image
 import csv
 
 import time
-import os
 import shutil
 
 import torch.utils.data as data
@@ -35,10 +42,10 @@ class ISIC(data.Dataset):
     }
 
     sfddic = {
-        'training_v1_2020': "train.sfd",
-        'test_v1_2020': "test.sfd",
-        'val_v1_2020': "val.sfd",
-        'isic2020_testset': "submission_test.sfd",
+        'training_v1_2020': "small_train.sfd",
+        'test_v1_2020': "small_test.sfd",
+        'val_v1_2020': "small_val.sfd",
+        'isic2020_testset': "small_submission_test.sfd",
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),

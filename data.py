@@ -1,3 +1,11 @@
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 from torchvision import transforms
 import torch
 import isic_classification_dataset as isic
@@ -218,16 +226,18 @@ class ImgAugTransform:
     def __call__(self, img):
         self.aug.reseed(random.randint(1, 10000))
 
-        start_time = time.time()
+        # start_time = time.time()
         img = np.array(img)
-        print(f'Img to array time: {time.time() - start_time}')
+        # print(f'Img to array time: {time.time() - start_time}')
 
-        start_time = time.time()
+        # start_time = time.time()
         img = ia.augmenters.PadToFixedSize(width=max(img.shape[0], img.shape[1]),
                                            height=max(img.shape[0], img.shape[1]),
                                            pad_mode=self.mode, position='center').augment_image(img)
+        # print(f'Pad to fix size time: {time.time() - start_time}')
+        # start_time = time.time()
         img = ia.augmenters.Resize({"width": self.size, "height": self.size}).augment_image(img)
-        print(f'Resize time: {time.time() - start_time}')
+        # print(f'Resize time: {time.time() - start_time}')
 
         if not self.SRV:
             plot(img)
@@ -367,12 +377,43 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
 
         valid_split_name = 'val_v1_2020'
         valid_transforms = test_transforms
+    elif dname == 'isic2020_waugm':
+        training_split_name = 'training_v1_2020'
+        training_transforms = transforms.Compose([
+            imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
+            CutOut(*cutout_params)
+        ])
+
+        test_split_name = 'test_v1_2020'
+        test_transforms = transforms.Compose([
+            imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
+        ])
+
+        valid_split_name = 'val_v1_2020'
+        valid_transforms = test_transforms
     elif dname == 'isic2020_inference':
         training_split_name = 'isic2020_testset'
 
         test_split_name = 'isic2020_testset'
         test_transforms = transforms.Compose([
             inference_imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
+        ])
+
+        valid_split_name = 'isic2020_testset'
+        valid_transforms = test_transforms
+        training_transforms = test_transforms
+    elif dname == 'isic2020_inference_waugm':
+        training_split_name = 'isic2020_testset'
+
+        test_split_name = 'isic2020_testset'
+        test_transforms = transforms.Compose([
+            imgaug_transforms,
             transforms.ToTensor(),
             transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
         ])
@@ -681,24 +722,26 @@ def draw_histogram(data_loader):
 
 
 if __name__ == '__main__':
+    workers = 0
 
     dataset = isic.ISIC(split_name='training_v1_2020',  # classes=[[0, 1, 2, 3, 4, 5, 6]],
                         size=(512, 512),
                         transform=transforms.Compose([
-                            transforms.Resize((512, 512)),
+                            #transforms.Resize((512, 512)),
                             transforms.ToTensor(),
                         ]),
-                        workers=16
+                        workers=workers
                         )
     data_loader = DataLoader(dataset,
-                             batch_size=16,
+                             batch_size=1,
                              shuffle=False,
-                             num_workers=16,
+                             num_workers=workers,
                              drop_last=False,
                              pin_memory=True)
 
-    find_stats(data_loader)
+    # find_stats(data_loader)
 
     # data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
-    # for stuff in data_loader:
-    #     pass
+    for image, label, name in data_loader:
+        if label == 1:
+            plot(torch.squeeze(image).permute(1, 2, 0))

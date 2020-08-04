@@ -1,3 +1,11 @@
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import numpy as np
 import numpy
 
@@ -22,9 +30,13 @@ class ConfusionMatrix:
         samples_for_class = np.sum(self.conf_matrix, 0)
         diag = np.diagonal(self.conf_matrix)
 
-        acc = np.sum(diag) / np.sum(samples_for_class)
-        w_acc = np.divide(diag, samples_for_class)
-        w_acc = np.mean(w_acc)
+        try:
+            acc = np.sum(diag) / np.sum(samples_for_class)
+            w_acc = np.divide(diag, samples_for_class)
+            w_acc = np.mean(w_acc)
+        except:
+            acc = 0
+            w_acc = 0
 
         return acc, w_acc
 
@@ -74,7 +86,6 @@ def compute_MCE(acc_bin, conf_bin, samples_per_bin):
     return mce, sample
 
 
-# accuracy per bin
 def accuracy_per_bin(predicted, real_tag, n_bins, apply_softmax):
     '''
     Computes the accuracy per bin. Each bin represents a partition of the probability space (0-1)
@@ -123,7 +134,6 @@ def accuracy_per_bin(predicted, real_tag, n_bins, apply_softmax):
     return acc, prob, samples_per_bin
 
 
-# aaverage confidence per bin per bin
 def average_confidence_per_bin(predicted, n_bins, apply_softmax):
     '''
     Computes the average confidence per bin. Each bin represents a partition of the probability space (0-1)

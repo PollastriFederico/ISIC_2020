@@ -1,8 +1,15 @@
-import logging
 import os
-import sys
 
 os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+import logging
+import sys
+from pathlib import Path
+
 import argparse
 import torch
 
@@ -233,7 +240,13 @@ class ClassifyNet:
 
 
 def train(class_model, num_epochs, starting_e=0):
-    writer = SummaryWriter(log_dir='/nas/softechict-nas-1/sallegretti/tensorboard')
+    tensorboard_root = '/nas/softechict-nas-1/sallegretti/tensorboard'
+    tensorboard_path = os.path.join(tensorboard_root, class_model.nname + '_augmentidx' + str(
+                           class_model.augm_config) + '_mixupcoeff.' + str(class_model.mixup_coeff) + '_cutout.holes' + str(
+                           class_model.cutout_nholes) + '.pad.' + str(class_model.cutout_pad_size))
+
+    Path(tensorboard_path).mkdir(parents=True, exist_ok=True)
+    writer = SummaryWriter(log_dir=tensorboard_path)
 
     for epoch in range(starting_e + 1, num_epochs):
         class_model.n.train()
@@ -438,21 +451,21 @@ def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
     conf_matrix_test.update_matrix(res, torch.tensor(true_lab, device='cuda'))
 
     ens_acc, ens_w_acc = conf_matrix_test.get_metrics()
-    ECE_test, MCE_test, BRIER_test, NNL_test = compute_calibration_measures(temp_ens_preds, true_lab,
-                                                                            apply_softmax=False,
-                                                                            bins=15)
+    ens_acc_1, pr, rec, fscore, auc = compute_accuracy_metrics(temp_ens_preds, true_lab)
+
     print("\n|| took {:.1f} minutes \n"
-          "| Mean Accuracy statistics: Acc test: {:.3f} AUC test: {:.3f} \n"
-          .format((time.time() - start_time) / 60., acc_test / i, auc_test / i))
+          "| Mean Accuracy statistics: Acc: {:.3f} AUC: {:.3f} \n"
+          "| Ensemble Accuracy statistics: Weighted Acc: {:.3f} AUC: {:.3f} Recall: {:.3f} Precision: {:.3f} Fscore: {:.3f} \n"
+          .format((time.time() - start_time) / 60., acc_test / i, auc_test / i, ens_w_acc, auc, rec, pr, fscore))
     print(conf_matrix_test.conf_matrix)
 
-    return ens_acc, ens_w_acc, (ens_preds / n_iter), true_lab
+    return ens_acc, ens_w_acc, conf_matrix_test, ens_acc, pr, rec, fscore, auc, temp_ens_preds, true_lab
 
 
 def train_temperature_scaling_decoupled(class_model, temp_scal_lr, temp_scal_epochs):
     class_model.n.eval()
 
-    data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2019',
+    data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2020',
                                                                    dataset_classes=class_model.classes,
                                                                    size=class_model.size,
                                                                    SRV=class_model.SRV,
