@@ -71,7 +71,7 @@ class ISIC(data.Dataset):
             self.perform_copy_into_tmp()
 
         self.images = Sfd(self.dataset_path, workers=self.workers)
-
+        # self.imgs = self.get_names(self.split_list)  #FROM 2019
         print("Time: " + str(time.time() - start_time))
 
     def __getitem__(self, index):
@@ -82,9 +82,11 @@ class ISIC(data.Dataset):
         Returns:
             tuple: (image, ground)
         """
-        #start_time = time.time()
+        # start_time = time.time()
+
         image = self.images[index]
-        #print(f'Get image time: {time.time() - start_time}')
+        # image = Image.open(self.imgs[index])  #FROM 2019
+        # print(f'Get image time: {time.time() - start_time}')
         if self.transform is not None:
             #start_time = time.time()
             image = self.transform(image)
