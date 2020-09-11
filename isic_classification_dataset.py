@@ -39,17 +39,48 @@ class ISIC(data.Dataset):
         'test_v1_2020': data_root + "2k20_test_partition.csv",
         'val_v1_2020': data_root + "2k20_validation_partition.csv",
         'isic2020_testset': data_root + "test.csv",
+        'train_submission_2020_1': data_root + "2k20_train_partition_1.csv",
+        'val_submission_2020_1': data_root + "2k20_validation_partition_1.csv",
+        'train_submission_2020_2': data_root +"2k20_train_partition_2.csv",
+        'val_submission_2020_2': data_root + "2k20_validation_partition_2.csv",
+        'train_submission_2020_3': data_root + "2k20_train_partition_3.csv",
+        'val_submission_2020_3': data_root + "2k20_validation_partition_3.csv",
+        'train_submission_2020_4': data_root + "2k20_train_partition_4.csv",
+        'val_submission_2020_4': data_root + "2k20_validation_partition_4.csv",
+        'train_submission_2020_5': data_root + "2k20_train_partition_5.csv",
+        'val_submission_2020_5': data_root + "2k20_validation_partition_5.csv",
+        'train_submission_2020_6': data_root + "2k20_train_partition_6.csv",
+        'val_submission_2020_6': data_root + "2k20_validation_partition_6.csv",
     }
 
-    sfddic = {
-        'training_v1_2020': "small_train.sfd",
-        'test_v1_2020': "small_test.sfd",
-        'val_v1_2020': "small_val.sfd",
-        'isic2020_testset': "small_submission_test.sfd",
+    smlsfddic = {
+        'training_v1_2020': "512_squared_train.sfd",
+        'test_v1_2020': "512_squared_test.sfd",
+        'val_v1_2020': "512_squared_val.sfd",
+        'isic2020_testset': "512_squared_submission_test.sfd",
+        'train_submission_2020_1': "train_1.sfd",
+        'val_submission_2020_1': "val_1.sfd",
+        'train_submission_2020_2': "train_2.sfd",
+        'val_submission_2020_2': "val_2.sfd",
+        'train_submission_2020_3': "train_3.sfd",
+        'val_submission_2020_3': "val_3.sfd",
+        'train_submission_2020_4': "train_4.sfd",
+        'val_submission_2020_4': "val_4.sfd",
+        'train_submission_2020_5': "train_5.sfd",
+        'val_submission_2020_5': "val_5.sfd",
+        'train_submission_2020_6': "train_6.sfd",
+        'val_submission_2020_6': "val_6.sfd",
+    }
+
+    bigsfddic = {
+        'training_v1_2020': "1024_train.sfd",
+        'test_v1_2020': "1024_test.sfd",
+        'val_v1_2020': "1024_val.sfd",
+        'isic2020_testset': "1024_submission_test.sfd",
     }
 
     def __init__(self, split_name='training_v1_2020', classes=[[0], [1]], size=(512, 512),
-                 transform=None, workers=0, copy_into_tmp=False, use_sfd=False,):
+                 transform=None, workers=0, copy_into_tmp=False):
         start_time = time.time()
         self.transform = transform
         self.split_list = None
@@ -57,7 +88,8 @@ class ISIC(data.Dataset):
         self.split_name = split_name
         self.workers = workers
         self.copy_into_tmp = copy_into_tmp
-        self.dataset_path = os.path.join(self.data_root, self.sfddic[self.split_name])
+        self.dataset_filename = self.smlsfddic[self.split_name] if size == (512, 512) else self.bigsfddic[self.split_name]
+        self.dataset_path = os.path.join(self.data_root, self.dataset_filename)
         if len(classes) == 1:
             self.classes = [[c] for c in classes[0]]
         else:
@@ -88,9 +120,9 @@ class ISIC(data.Dataset):
         # image = Image.open(self.imgs[index])  #FROM 2019
         # print(f'Get image time: {time.time() - start_time}')
         if self.transform is not None:
-            #start_time = time.time()
+            # start_time = time.time()
             image = self.transform(image)
-            #print(f'Get transform time: {time.time() - start_time}')
+            # print(f'Get transform time: {time.time() - start_time}')
 
         return image, self.lbls[index], self.split_list[index]
 
@@ -117,8 +149,8 @@ class ISIC(data.Dataset):
         return split_list, labels_list
 
     def perform_copy_into_tmp(self):
-        dataset_path_tmp = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name]
-        finished_path = '/tmp/sallegretti_dataset_' + self.sfddic[self.split_name] + '.finished'
+        dataset_path_tmp = '/tmp/sallegretti_dataset_' + self.dataset_filename
+        finished_path = '/tmp/sallegretti_dataset_' + self.dataset_filename + '.finished'
 
         # atomically create tmp file if it does not exists
         try:

@@ -344,6 +344,19 @@ class FocalLoss(nn.Module):
         return loss
 
 
+class ComboLoss(nn.Module):
+
+    def __init__(self, weight=None, combo_weight=(0.5, 0.5), gamma=2):
+        super().__init__()
+        self.focal_loss = FocalLoss(gamma, weight)
+        self.cross_entropy_loss = nn.CrossEntropyLoss(weight)
+        self.combo_weight = combo_weight
+
+    def forward(self, input, target):
+        return self.combo_weight[0] * self.focal_loss.forward(input, target) + \
+               self.combo_weight[1] * self.cross_entropy_loss.forward(input, target)
+
+
 class GradientPenalty:
     """Computes the gradient penalty as defined in "Improved Training of Wasserstein GANs"
     (https://arxiv.org/abs/1704.00028)
@@ -428,6 +441,8 @@ def get_criterion(lossname, dataset_classes=[[0], [1]]):
         criterion = nn.CrossEntropyLoss(weight=torch.tensor(weights, device='cuda'))
     elif lossname == 'focal':
         criterion = FocalLoss(weight=torch.tensor(weights, device='cuda'))
+    elif lossname == 'combo':
+        criterion = ComboLoss(weight=torch.tensor(weights, device='cuda'))
 
     return criterion
 

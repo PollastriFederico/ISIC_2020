@@ -11,9 +11,19 @@ import torch
 import time
 import numpy as np
 from utils_metrics import compute_accuracy_metrics
+import csv
 
 from classification_net import ClassifyNet, eval, ensemble_aug_eval
 from utils import ConfusionMatrix, compute_calibration_measures
+
+
+def make_submission_csv(file_name, img_names, preds):
+    with open(file_name, 'w') as csvfile:
+        csv_writer = csv.writer(csvfile, delimiter=',')
+        csv_writer.writerow(['image_name', 'target'])
+        for i in range(len(img_names)):
+            csv_writer.writerow([img_names[i], f'{preds[i].item():.3f}'])
+
 
 if __name__ == '__main__':
 
@@ -26,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--validation', action='store_true', help='Boolean flag for using validation set')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size during the training')
     parser.add_argument('--log_ens', action='store_true', help='Boolean flag for ensembling through logarithms')
-
+    parser.add_argument('--copy_into_tmp', action='store_true', help='Boolean flag for copying dataset into /tmp')
 
     opt = parser.parse_args()
     if opt.dataset == 'isic2018_test' and opt.da_n_iter != 0:
@@ -35,7 +45,6 @@ if __name__ == '__main__':
         opt.dataset = 'isic2019_testwaugm'
     if opt.da_n_iter != 0:
         opt.dataset += '_waugm'
-
 
     print(opt)
 
@@ -50,7 +59,7 @@ if __name__ == '__main__':
     net_parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     net_parser.add_argument('--batch_size', type=int, default=16, help='batch size during the training')
     net_parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
-    net_parser.add_argument('--loss', default='cross_entropy', choices=['cross_entropy', 'focal'])
+    net_parser.add_argument('--loss', default='cross_entropy', choices=['cross_entropy', 'focal', 'combo'])
     net_parser.add_argument('--optimizer', default='SGD', choices=['SGD', 'Adam'])
     net_parser.add_argument('--scheduler', default='plateau', choices=['plateau', 'None'])
     net_parser.add_argument('--epochs', type=int, default=150, help='number of epochs to train')
@@ -64,6 +73,17 @@ if __name__ == '__main__':
     net_parser.add_argument('--cutout_holes', nargs='+', type=int, default=[0], help='number of cutout holes.')
     net_parser.add_argument('--mixup', type=float, default=0.0,
                             help='mixout coefficient. If 0 is provided no mixup is applied')
+    net_parser.add_argument('--pretrained_isic', action='store_true', help='Pretrained on ISIC2019')
+
+    output_path = '/nas/softechict-nas-1/sallegretti/isic_submission_output'
+    avgname = os.path.basename(opt.avg)
+    fname = opt.dataset + "_" + os.path.splitext(avgname)[0]
+    if opt.calibrated:
+        fname += "_calibrated"
+    if opt.da_n_iter > 0:
+        fname += "_" + str(opt.da_n_iter) + "DAiter"
+    if opt.validation:
+        fname += "_validation"
 
     ens_preds = None
     counter = 0.0
@@ -79,13 +99,27 @@ if __name__ == '__main__':
         net_opt = net_parser.parse_args(line.split())
         print(net_opt)
 
+        output_file = os.path.join(output_path, "output_" + fname + f"_{int(counter)}.npy")
+
+        if os.path.exists(output_file):
+            print('Loading prediction file...')
+            try:
+                if ens_preds is None:
+                    ens_preds = np.load(output_file)
+                else:
+                    ens_preds += np.load(output_file)
+            except Exception as e:
+                print(f'Exception {e}')
+            continue
+
         n = ClassifyNet(net=net_opt.network, dname=opt.dataset, dropout=net_opt.dropout,
                         classes=net_opt.classes, l_r=net_opt.learning_rate, loss=net_opt.loss,
                         optimizer=net_opt.optimizer, scheduler=net_opt.scheduler, size=net_opt.size,
                         batch_size=opt.batch_size, n_workers=net_opt.workers, pretrained=(not net_opt.from_scratch),
                         augm_config=net_opt.augm_config, save_dir=net_opt.save_dir, mixup_coeff=net_opt.mixup,
                         cutout_params=[net_opt.cutout_holes, net_opt.cutout_pad], total_epochs=net_opt.epochs,
-                        SRV=net_opt.SRV, no_logs=True, optimize_temp_scal=opt.calibrated)
+                        SRV=net_opt.SRV, no_logs=True, optimize_temp_scal=opt.calibrated,
+                        copy_into_tmp=opt.copy_into_tmp, pretrained_isic=net_opt.pretrained_isic)
 
         if not net_opt.load_epoch == 0:
             n.load(net_opt.load_epoch)
@@ -95,19 +129,29 @@ if __name__ == '__main__':
             n.calibration_variables[2] = n.calibration_variables[1]
 
         if opt.da_n_iter != 0:
-            acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, preds, true_lab = ensemble_aug_eval(opt.da_n_iter, n, opt.calibrated)
+            acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, preds, true_lab = ensemble_aug_eval(opt.da_n_iter, n,
+                                                                                                      opt.calibrated)
 
         else:
             acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, preds, true_lab = eval(n, n.test_data_loader,
                                                                                          *n.calibration_variables[2],
-                                                                                            opt.calibrated)
+                                                                                         opt.calibrated)
 
-        auc_test += auc
-        w_acc_test += w_acc
-        if ens_preds is None:
-            ens_preds = preds
-        else:
-            ens_preds += preds
+        if not isinstance(preds, np.ndarray):
+            preds = preds.numpy()
+
+        np.save(output_file, preds)     # only save predictions of this line
+
+        try:
+            auc_test += auc
+            w_acc_test += w_acc
+            if ens_preds is None:
+                ens_preds = preds
+            else:
+                ens_preds += preds
+        except Exception as e:
+            print(f'Exception {e}')
+
 
     conf_matrix_test = ConfusionMatrix(n.num_classes)
     temp_ens_preds = ens_preds / counter
@@ -123,17 +167,10 @@ if __name__ == '__main__':
     print("\n|| took {:.1f} minutes \n"
           "| Mean Accuracy statistics: Weighted Acc: {:.3f} AUC: {:.3f} \n"
           "| Ensemble Accuracy statistics: Weighted Acc: {:.3f} AUC: {:.3f} Recall: {:.3f} Precision: {:.3f} Fscore: {:.3f} \n"
-          .format((time.time() - start_time) / 60., w_acc_test / counter, auc_test / counter, ens_w_acc, auc, rec, pr, fscore))
+          .format((time.time() - start_time) / 60., w_acc_test / counter, auc_test / counter, ens_w_acc, auc, rec, pr,
+                  fscore))
     print(conf_matrix_test.conf_matrix)
 
-    avgname = os.path.basename(opt.avg)
-    fname = opt.dataset + "_" + os.path.splitext(avgname)[0]
-    if opt.calibrated:
-        fname += "_calibrated"
-    if opt.da_n_iter > 0:
-        fname += "_" + str(opt.da_n_iter) + "DAiter"
-    if opt.validation:
-        fname += "_validation"
-
-    np.savetxt("/nas/softechict-nas-1/sallegretti/isic_submission_output/output_" + fname + ".csv", temp_ens_preds, delimiter=",")
-    np.save("/nas/softechict-nas-1/sallegretti/isic_submission_output/output_" + fname + ".npy", temp_ens_preds)
+    np.save(os.path.join(output_path, "output_" + fname + ".npy"), temp_ens_preds)
+    make_submission_csv(os.path.join(output_path, "output_" + fname + ".csv"), n.test_data_loader.dataset.split_list,
+                        temp_ens_preds[:, 1])  # TODO: try this

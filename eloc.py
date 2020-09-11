@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from classification_net import ClassifyNet, eval
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
-from data import get_dataset, get_dataset_squares_of_skin
+from data import get_dataloader, get_dataset_squares_of_skin
 
 from scipy.stats import wasserstein_distance
 
@@ -211,9 +211,9 @@ if __name__ == '__main__':
                     cutout_params=[opt.cutout_holes, opt.cutout_pad], total_epochs=opt.epochs, SRV=opt.SRV,
                     no_logs=True, optimize_temp_scal=opt.calibrated, drop_last=True)
 
-    ood_dataloaders = get_dataset(dname=opt.dataset, size=opt.size, dataset_classes=opt.ood_classes, SRV=True,
-                                  batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
-                                  cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)
+    ood_dataloaders = get_dataloader(dname=opt.dataset, size=opt.size, dataset_classes=opt.ood_classes, SRV=True,
+                                     batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
+                                     cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)
 
     sood_dataloaders = get_dataset_squares_of_skin(dname=opt.dataset, size=opt.size,
                                                    SRV=True,
@@ -224,9 +224,9 @@ if __name__ == '__main__':
 
     rood_class = [[7]]
 
-    rood_dataloaders = get_dataset(dname=opt.dataset, size=opt.size, dataset_classes=rood_class, SRV=True,
-                                   batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
-                                   cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)
+    rood_dataloaders = get_dataloader(dname=opt.dataset, size=opt.size, dataset_classes=rood_class, SRV=True,
+                                      batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
+                                      cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)
 
     if not opt.load_epoch == 0:
         n.load(opt.load_epoch)

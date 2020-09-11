@@ -1,7 +1,7 @@
 from __future__ import print_function
 import argparse
 
-from data import get_dataset
+from data import get_dataloader
 from model import get_criterion
 from classification_net import ClassifyNet
 
@@ -513,9 +513,9 @@ if __name__ == '__main__':
     net_opt = net_parser.parse_args()
     print(net_opt)
 
-    _, in_dataset, _ = get_dataset(dname='isic2019', dataset_classes=[[0], [1], [2], [3], [4], [5], [6]], SRV=True,
-                                   batch_size=net_opt.batch_size)
-    _, out_dataset, _ = get_dataset(dname='isic2019', dataset_classes=[[7]], SRV=True, batch_size=net_opt.batch_size)
+    _, in_dataset, _ = get_dataloader(dname='isic2019', dataset_classes=[[0], [1], [2], [3], [4], [5], [6]], SRV=True,
+                                      batch_size=net_opt.batch_size)
+    _, out_dataset, _ = get_dataloader(dname='isic2019', dataset_classes=[[7]], SRV=True, batch_size=net_opt.batch_size)
     criterion = get_criterion(lossname='cross_entropy', dataset_classes=[[0], [1], [2], [3], [4], [5], [6]])
 
     n = ClassifyNet(net=net_opt.network, dname=net_opt.dataset, dropout=net_opt.dropout,

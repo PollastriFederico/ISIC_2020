@@ -9,7 +9,7 @@ import numpy as np
 import itertools
 from classification_net import ClassifyNet
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
-from data import get_dataset
+from data import get_dataloader
 from eloc_test import eloc_eval, eloc_ensemble_aug_eval, eloc_output
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -176,15 +176,15 @@ if __name__ == '__main__':
 
         if opt.da_n_iter == 0:
 
-            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataset(dname='isic2019_test',
-                                                                                 SRV=True,
-                                                                                 batch_size=opt.batch_size)
+            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataloader(dname='isic2019_test',
+                                                                                    SRV=True,
+                                                                                    batch_size=opt.batch_size)
         else:
-            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataset(dname='isic2019_test_waugm',
-                                                                                 SRV=True,
-                                                                                 batch_size=opt.batch_size,
-                                                                                 augm_config=net_opt.augm_config,
-                                                                                 cutout_params=[net_opt.cutout_holes,
+            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataloader(dname='isic2019_test_waugm',
+                                                                                    SRV=True,
+                                                                                    batch_size=opt.batch_size,
+                                                                                    augm_config=net_opt.augm_config,
+                                                                                    cutout_params=[net_opt.cutout_holes,
                                                                                                 net_opt.cutout_pad])
 
         # if opt.OOD is not None:

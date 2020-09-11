@@ -8,7 +8,7 @@ import numpy as np
 import itertools
 from classification_net import ClassifyNet
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
-from data import get_dataset
+from data import get_dataloader
 from GAOODD import GAOODN
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -150,7 +150,7 @@ def eloc_ensemble_aug_eval(n_iter, class_model, eps=0.002, temperature=1000, wit
     ens_preds = torch.zeros_like(class_model.calibration_variables[2][0])
 
     start_time = time.time()
-    # data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2019_testwaugm', size=class_model.size,
+    # data_loader, test_data_loader, valid_data_loader = get_dataloader(dname='isic2019_testwaugm', size=class_model.size,
     #                                                                SRV=class_model.SRV,
     #                                                                batch_size=class_model.batch_size,
     #                                                                n_workers=class_model.n_workers,
@@ -287,9 +287,9 @@ if __name__ == '__main__':
         if not net_opt.load_epoch_gan == 0:
             n.load(net_opt.load_epoch_gan)
 
-        n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataset(dname='isic2019',
-                                                                             SRV=True,
-                                                                             batch_size=net_opt.batch_size)
+        n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataloader(dname='isic2019',
+                                                                                SRV=True,
+                                                                                batch_size=net_opt.batch_size)
 
         if opt.OOD is not None:
             # to measures calibration stuff

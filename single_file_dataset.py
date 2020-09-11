@@ -16,6 +16,7 @@ from torch.utils import data
 import csv
 import imgaug as ia
 
+
 # Single File Dataset (.sfd) format
 # All numbers are little endian
 #
@@ -104,6 +105,69 @@ class Sfd:
             out_f.seek(4, 0)
             out_f.write(positions.tobytes())
 
+    @staticmethod
+    def create_from_sfd(filename, img_list, sfd_dict, data_root='', transform=None):
+        '''
+
+        Args:
+            filename:
+            img_list:
+            sfd_dict: dict in the form {sfd_filename: sfd_img_csv}
+            transform: callable that takes a PIL Image as input and outputs a "bytes" object
+
+        Returns:
+
+        '''
+        length = len(img_list)
+
+        positions = np.empty([length], dtype=np.uint64)
+        cur_pos = 4 + 8 * length
+
+        sfd_list = []
+        for sfd_filename, sfd_img_csv in sfd_dict.items():
+            sfd_img_list = []
+            with open(os.path.join(data_root, sfd_img_csv)) as csvfile:
+                readCSV = csv.reader(csvfile, delimiter=',')
+                for row in readCSV:
+                    if row[0] == 'image_name':
+                        continue
+                    sfd_img_list.append(row[0])
+            sfd = Sfd(os.path.join(data_root, sfd_filename))
+            sfd_list.append((sfd, sfd_img_list))
+
+        with open(filename, 'wb') as out_f:
+            out_f.write(length.to_bytes(4, 'little', signed=False))
+            out_f.write(positions.tobytes())
+            for i, img in enumerate(img_list):
+
+                for sfd, sfd_img_list in sfd_list:
+                    if img in sfd_img_list:
+                        index = sfd_img_list.index(img)
+                        pil_img = sfd[index]
+                        break
+                else:
+                    raise ValueError(f'Image {img} not found')
+
+                if not transform:
+                    image_data = image_to_bytes(pil_img)
+                else:
+                    image_data = transform(pil_img)
+
+                out_f.write(len(image_data).to_bytes(4, 'little', signed=False))
+                out_f.write(image_data)
+
+                # update positions
+                positions[i] = cur_pos
+                cur_pos += 4 + len(image_data)
+
+                if i % 100 == 0 and i > 0:
+                    print(f'{i}/{len(img_list)}', end='\n')
+            print(f'{len(img_list)}/{len(img_list)}', end='\n')
+
+            # write positions list before the images list
+            out_f.seek(4, 0)
+            out_f.write(positions.tobytes())
+
 
 def image_to_bytes(img: Image):
     img_byte_stream = io.BytesIO()
@@ -164,13 +228,47 @@ def create_isic2020_sfd(prefix='', transform=None):
                    transform=transform)
 
 
+def create_isic2020_sfd_splits(prefix='', transform=None):
+    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+
+    csv_dict = {
+        '2k20_validation_partition_5.csv': 'val_5.sfd',
+        '2k20_train_partition_5.csv': 'train_5.sfd',
+        '2k20_validation_partition_6.csv': 'val_6.sfd',
+        '2k20_train_partition_6.csv': 'train_6.sfd',
+    }
+
+    sfd_dict = {
+        '512_squared_train.sfd': '2k20_train_partition.csv',
+        '512_squared_test.sfd': '2k20_test_partition.csv',
+        '512_squared_val.sfd': '2k20_validation_partition.csv'
+    }
+
+    for key, value in csv_dict.items():
+        img_list = []
+        with open(os.path.join(data_root, key), 'r') as csvfile:
+            readCSV = csv.reader(csvfile, delimiter=',')
+            for row in readCSV:
+                if row[0] == 'image_name':
+                    continue
+                img_list.append(row[0])
+
+        Sfd.create_from_sfd(filename=os.path.join(data_root, f'{prefix}{value}'),
+                            img_list=img_list,
+                            sfd_dict=sfd_dict,
+                            data_root=data_root,
+                            transform=transform)
+
+
 if __name__ == '__main__':
     #create_isic2020_test_sfd()
     #create_isic2020_sfd(prefix='512_squared_', transform=ResizeSquaredTransform(size=512, pad_mode='reflect'))
 
+    create_isic2020_sfd_splits()
+
     img_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
     #
-    sfd = Sfd(os.path.join(img_root, '512_squared_val.sfd'))
+    sfd = Sfd(os.path.join(img_root, 'train_6.sfd'))
     img = sfd[0]
     # img.show()
 

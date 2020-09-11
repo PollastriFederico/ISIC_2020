@@ -5,7 +5,7 @@ if torch.__version__ != '1.1.0':
     raise (Exception('Torch version must be 1.1.0'))
 import time
 from classification_net import ClassifyNet, train_temperature_scaling_decoupled, eval
-from data import get_dataset
+from data import get_dataloader
 from utils import ConfusionMatrix, compute_calibration_measures
 
 parser = argparse.ArgumentParser()
@@ -65,14 +65,14 @@ if __name__ == '__main__':
 
         models_list.append(n)
 
-    data_loader, ood_test_data_loader, ood_valid_data_loader = get_dataset(size=n.size,
-                                                                   dataset_classes=[[7]],
-                                                                   SRV=n.SRV,
-                                                                   batch_size=1,
-                                                                   n_workers=n.n_workers,
-                                                                   augm_config=n.augm_config,
-                                                                   cutout_params=[[0],[0]],
-                                                                   drop_last_flag=False)
+    data_loader, ood_test_data_loader, ood_valid_data_loader = get_dataloader(size=n.size,
+                                                                              dataset_classes=[[7]],
+                                                                              SRV=n.SRV,
+                                                                              batch_size=1,
+                                                                              n_workers=n.n_workers,
+                                                                              augm_config=n.augm_config,
+                                                                              cutout_params=[[0],[0]],
+                                                                              drop_last_flag=False)
 
 
     baseline_network=models_list[7]

@@ -67,8 +67,8 @@ def split_dataset_wvalidation(test_class_samples=[1000, 2250, 750, 200, 500, 75,
         tr_l.append(l[test_class_samples[i] + val_class_samples[i]:])
 
     with open('2k20_test_partition.csv', 'w', newline='') as testfile, \
-            open('2k20_train_partition.csv', 'w', newline='') as trainfile, \
-            open('2k20_validation_partition.csv', 'w', newline='') as valfile:
+            open('2k20_train_partition_6.csv', 'w', newline='') as trainfile, \
+            open('2k20_validation_partition_6.csv', 'w', newline='') as valfile:
         test_writer = csv.writer(testfile, delimiter=',')
         val_writer = csv.writer(valfile, delimiter=',')
         train_writer = csv.writer(trainfile, delimiter=',')
@@ -85,4 +85,4 @@ def split_dataset_wvalidation(test_class_samples=[1000, 2250, 750, 200, 500, 75,
 
 
 if __name__ == '__main__':
-    split_dataset_wvalidation([4920, 80], [980, 20])
+    split_dataset_wvalidation([0, 0], [980, 20])

@@ -4,7 +4,7 @@ import time
 import numpy as np
 from classification_net import ClassifyNet, eval, ensemble_aug_eval
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
-from data import get_dataset
+from data import get_dataloader
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
@@ -78,9 +78,9 @@ if __name__ == '__main__':
         if opt.OOD == 'isic':
             n_cl_list = [c[0] for c in n.classes]
             cl_list = [[c for c in range(8) if c not in n_cl_list]]
-            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataset(dname='isic2019',
-                                                                                 dataset_classes=cl_list, SRV=True,
-                                                                                 batch_size=net_opt.batch_size)
+            n.data_loader, n.test_data_loader, n.valid_data_loader = get_dataloader(dname='isic2019',
+                                                                                    dataset_classes=cl_list, SRV=True,
+                                                                                    batch_size=net_opt.batch_size)
         elif opt.OOD == 'birds':
             birds_dataset = birds_caltech_2011('/nas/softechict-nas-1/fpollastri/data/birds/',
                                                transform=transforms.Compose([

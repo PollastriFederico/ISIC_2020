@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import time
 
+
 # Cutout Data Augmentation Class. Can be used in the torchvision compose pipelin
 class CutOut(object):
     """Randomly mask out one or more patches from an image.
@@ -352,9 +353,9 @@ def plot(img):
     plt.show(block=False)
 
 
-def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=False,
-                batch_size=16, n_workers=0, augm_config=0, cutout_params=[[0], [0]], drop_last_flag=False,
-                copy_into_tmp=False):
+def get_dataloader(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=False,
+                   batch_size=16, n_workers=0, augm_config=0, cutout_params=[[0], [0]], drop_last_flag=False,
+                   copy_into_tmp=False):
     dataset = None
     test_dataset = None
     valid_dataset = None
@@ -422,6 +423,25 @@ def get_dataset(dname='isic2020', dataset_classes=[[0], [1]], size=512, SRV=Fals
         valid_split_name = 'isic2020_testset'
         valid_transforms = test_transforms
         training_transforms = test_transforms
+    elif 'isic2020_submission_partition_' in dname:
+        training_split_name = 'train_submission_2020_' + dname[-1]
+        training_transforms = transforms.Compose([
+            imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
+            CutOut(*cutout_params)
+        ])
+
+        test_split_name = 'val_submission_2020_' + dname[-1]
+        test_transforms = transforms.Compose([
+            inference_imgaug_transforms,
+            transforms.ToTensor(),
+            transforms.Normalize((0.8062, 0.6214, 0.5914), (0.0826, 0.0964, 0.1085)),
+        ])
+
+        valid_split_name = test_split_name
+        valid_transforms = test_transforms
+
     else:
         print("WRONG DATASET NAME")
         raise Exception("WRONG DATASET NAME")
@@ -742,7 +762,7 @@ if __name__ == '__main__':
 
     # find_stats(data_loader)
 
-    # data_loader, _, _ = get_dataset(augm_config=16, dname='isic2020_inference')
+    # data_loader, _, _ = get_dataloader(augm_config=16, dname='isic2020_inference')
     for image, label, name in data_loader:
         if label == 1:
             plot(torch.squeeze(image).permute(1, 2, 0))

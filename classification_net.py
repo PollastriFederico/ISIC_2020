@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 import time
 import numpy as np
 from model import get_model, get_criterion, get_optimizer, get_scheduler, TemperatureScaling
-from data import get_dataset, CutOut
+from data import get_dataloader, CutOut
 from utils import ConfusionMatrix, compute_calibration_measures, entropy_categorical
 from utils_metrics import compute_accuracy_metrics
 
@@ -31,7 +31,7 @@ class ClassifyNet:
     def __init__(self, net, dname, dropout, l_r, loss, optimizer, scheduler, size, batch_size, n_workers, augm_config,
                  save_dir, mixup_coeff, cutout_params, total_epochs, SRV,
                  classes=[[0], [1]], pretrained=True, no_logs=False,
-                 optimize_temp_scal=False, drop_last=True, copy_into_tmp=False):
+                 optimize_temp_scal=False, drop_last=True, copy_into_tmp=False, pretrained_isic=False):
         # Hyper-parameters
         self.net = net
         self.dropout = dropout
@@ -61,8 +61,9 @@ class ClassifyNet:
         self.no_logs = no_logs
         self.optimize_temp_scal = optimize_temp_scal
         self.copy_into_tmp = copy_into_tmp
+        self.pretrained_isic = pretrained_isic
 
-        self.nname = self.net + '_ISIC2019'
+        self.nname = self.net + '_ISIC2019' + ('_pretrained' if self.pretrained_isic else '')
         if self.dropout:
             self.nname = 'dropout_' + self.nname
 
@@ -72,16 +73,16 @@ class ClassifyNet:
         if optimize_temp_scal:
             self.temp_scal_model = TemperatureScaling().to('cuda')  # no wrapping for efficiency in training
 
-        self.data_loader, self.test_data_loader, self.valid_data_loader = get_dataset(dname=self.dname,
-                                                                                      size=self.size,
-                                                                                      dataset_classes=self.classes,
-                                                                                      SRV=self.SRV,
-                                                                                      batch_size=self.batch_size,
-                                                                                      n_workers=self.n_workers,
-                                                                                      augm_config=self.augm_config,
-                                                                                      cutout_params=cutout_params,
-                                                                                      drop_last_flag=drop_last,
-                                                                                      copy_into_tmp=self.copy_into_tmp)
+        self.data_loader, self.test_data_loader, self.valid_data_loader = get_dataloader(dname=self.dname,
+                                                                                         size=self.size,
+                                                                                         dataset_classes=self.classes,
+                                                                                         SRV=self.SRV,
+                                                                                         batch_size=self.batch_size,
+                                                                                         n_workers=self.n_workers,
+                                                                                         augm_config=self.augm_config,
+                                                                                         cutout_params=cutout_params,
+                                                                                         drop_last_flag=drop_last,
+                                                                                         copy_into_tmp=self.copy_into_tmp)
 
         self.criterion = get_criterion(self.lossname, [[0], [1]])  # self.classes
         self.optimizer = get_optimizer(self.n, self.learning_rate, self.optname)
@@ -100,21 +101,24 @@ class ClassifyNet:
 
         if mixup_coeff > 0.0:
             self.data_loader = [self.data_loader]
-            dl, _, _ = get_dataset(dname=self.dname, size=self.size, SRV=self.SRV, batch_size=self.batch_size,
-                                   n_workers=self.n_workers, augm_config=self.augm_config, cutout_params=cutout_params)
+            dl, _, _ = get_dataloader(dname=self.dname, size=self.size, SRV=self.SRV, batch_size=self.batch_size,
+                                      n_workers=self.n_workers, augm_config=self.augm_config,
+                                      cutout_params=cutout_params)
             self.data_loader.append(dl)
 
         # logger
         if not self.no_logs:
             model_log_dir = os.path.join(self.save_dir,
-                                         self.nname + '_epoch.' + str(total_epochs) + '_augmentidx.' + str(
-                                             self.augm_config) + '_mixupcoeff.' + str(
-                                             self.mixup_coeff) + '_cutout.holes' + str(
-                                             self.cutout_nholes) + '.pad.' + str(
-                                             self.cutout_pad_size) + '.classes.' + str(self.classes) + '_logger.log')
+                                         self.get_model_filename(total_epochs, classes=True) + '_logger.log')
 
             logging.basicConfig(filename=model_log_dir, level=logging.INFO)
             self.logger = logging
+
+    def get_model_filename(self, n_epoch=None, classes=False):
+        return self.nname + (('_epoch.' + str(n_epoch)) if n_epoch else '') + '_augmentidx' + str(
+            self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
+            self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + ('.classes.' + str(
+            self.classes) if classes else '') + ('_loss.' + self.lossname if self.lossname != 'cross_entropy' else '')
 
     def save(self, n_epoch=0):
         if self.optimize_temp_scal:
@@ -125,13 +129,9 @@ class ClassifyNet:
     def save_mode_zero(self, n_epoch=0):
         try:
             torch.save(self.n.state_dict(),
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_net.pth'))
+                       os.path.join(self.save_dir, self.get_model_filename(n_epoch) + '_net.pth'))
             torch.save(self.optimizer.state_dict(),
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_opt.pth'))
+                       os.path.join(self.save_dir, self.get_model_filename(n_epoch) + '_opt.pth'))
             print("mode zero model weights successfully saved")
         except Exception:
             print("Error during Saving")
@@ -139,15 +139,9 @@ class ClassifyNet:
     def save_mode_one(self, n_epoch=0):
         try:
             torch.save(self.n.state_dict(),
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '.classes.' + str(
-                           self.classes) + '_net.pth'))
+                       os.path.join(self.save_dir, self.get_model_filename(n_epoch, classes=True) + '_net.pth'))
             torch.save(self.optimizer.state_dict(),
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '.classes.' + str(
-                           self.classes) + '_opt.pth'))
+                       os.path.join(self.save_dir, self.get_model_filename(n_epoch, classes=True) + '_opt.pth'))
             print("mode one model weights successfully saved")
         except Exception:
             print("Error during Saving")
@@ -157,21 +151,16 @@ class ClassifyNet:
             saved_dict = {'model_parameters': self.n.state_dict(),
                           'temperature_scal': self.temp_scal_model.state_dict()}
             torch.save(saved_dict,
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(
-                           self.cutout_pad_size) + '_temperature.scaling.decoupled_net.pth'))
+                       os.path.join(self.save_dir,
+                                    self.get_model_filename(n_epoch) + '_temperature.scaling.decoupled_net.pth'))
             torch.save(self.optimizer.state_dict(),
-                       os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                           self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                           self.cutout_nholes) + '.pad.' + str(
-                           self.cutout_pad_size) + '_temperature.scaling.decoupled_opt.pth'))
+                       os.path.join(self.save_dir,
+                                    self.get_model_filename(n_epoch) + '_temperature.scaling.decoupled_opt.pth'))
             print("model weights and temp scal T successfully saved")
         except Exception:
             print("Error during Saving")
 
     def load(self, n_epoch=0):
-
         if self.optimize_temp_scal:
             try:
                 self.load_with_temp_scal(n_epoch)
@@ -202,48 +191,37 @@ class ClassifyNet:
 
     def load_mode_zero(self, n_epoch=0):
         self.n.load_state_dict(
-            torch.load(os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_net.pth')))
+            torch.load(os.path.join(self.save_dir, self.get_model_filename(n_epoch) + '_net.pth')))
         self.optimizer.load_state_dict(
-            torch.load(os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_opt.pth')))
+            torch.load(os.path.join(self.save_dir, self.get_model_filename(n_epoch) + '_opt.pth')))
         print("mode zero model weights successfully loaded")
 
     def load_mode_one(self, n_epoch=0):
         self.n.load_state_dict(
-            torch.load(os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '.classes.' + str(
-                self.classes) + '_net.pth')))
+            torch.load(os.path.join(self.save_dir, self.get_model_filename(n_epoch, classes=True) + '_net.pth')))
         self.optimizer.load_state_dict(
-            torch.load(os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '.classes.' + str(
-                self.classes) + '_opt.pth')))
+            torch.load(os.path.join(self.save_dir, self.get_model_filename(n_epoch, classes=True) + '_opt.pth')))
         print("mode one model weights successfully loaded")
 
     def load_with_temp_scal(self, n_epoch=0):
         saved_dict = torch.load(
-            os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_temperature.scaling.decoupled_net.pth'))
+            os.path.join(self.save_dir, self.get_model_filename(n_epoch) + '_temperature.scaling.decoupled_net.pth'))
 
         self.n.load_state_dict(saved_dict['model_parameters'])
         self.temp_scal_model.load_state_dict(saved_dict['temperature_scal'])
         self.optimizer.load_state_dict(
-            torch.load(os.path.join(self.save_dir, self.nname + '_epoch.' + str(n_epoch) + '_augmentidx' + str(
-                self.augm_config) + '_mixupcoeff.' + str(self.mixup_coeff) + '_cutout.holes' + str(
-                self.cutout_nholes) + '.pad.' + str(self.cutout_pad_size) + '_temperature.scaling.decoupled_opt.pth')))
+            torch.load(os.path.join(self.save_dir,
+                                    self.get_model_filename(n_epoch) + '_temperature.scaling.decoupled_opt.pth')))
         print("model weights and temp scal T successfully loaded")
+
+    def load_pretrained_isic(self):
+        self.n.load_state_dict(torch.load(os.path.join(self.save_dir, self.nname + '_net.pth')))
+        print('pretrained weights on isic 2019 successfully loaded')
 
 
 def train(class_model, num_epochs, starting_e=0):
     tensorboard_root = '/nas/softechict-nas-1/sallegretti/tensorboard'
-    tensorboard_path = os.path.join(tensorboard_root, class_model.nname + '_augmentidx' + str(
-                           class_model.augm_config) + '_mixupcoeff.' + str(class_model.mixup_coeff) + '_cutout.holes' + str(
-                           class_model.cutout_nholes) + '.pad.' + str(class_model.cutout_pad_size))
+    tensorboard_path = os.path.join(tensorboard_root, class_model.get_model_filename())
 
     Path(tensorboard_path).mkdir(parents=True, exist_ok=True)
     writer = SummaryWriter(log_dir=tensorboard_path)
@@ -276,12 +254,13 @@ def train(class_model, num_epochs, starting_e=0):
                 1],
             class_model.optimize_temp_scal)
 
-        acc_test, w_acc_test, conf_matrix_test, acc_1_test, pr_test, rec_test, fscore_test, auc_test, _, _ = eval(class_model,
-                                                                                                            class_model.test_data_loader,
-                                                                                                            *
-                                                                                                            class_model.calibration_variables[
-                                                                                                                2],
-                                                                                                            class_model.optimize_temp_scal)
+        acc_test, w_acc_test, conf_matrix_test, acc_1_test, pr_test, rec_test, fscore_test, auc_test, _, _ = eval(
+            class_model,
+            class_model.test_data_loader,
+            *
+            class_model.calibration_variables[
+                2],
+            class_model.optimize_temp_scal)
 
         print("\n|| Epoch {} took {:.1f} minutes \t LossCE {:.5f} \n"
               "| Accuracy statistics: weighted Acc valid: {:.3f}  weighted Acc test: {:.3f} Acc valid: {:.3f}  Acc test: {:.3f} \n"
@@ -289,7 +268,7 @@ def train(class_model, num_epochs, starting_e=0):
               "| Acc_1 test: {:.3f} Pr test: {:.3f} Rec test: {:.3f} Fscore test: {:.3f} Auc test: {:.3f}\n".format(
             epoch, (time.time() - start_time) / 60., np.mean(losses), w_acc_valid, w_acc_test, acc_valid, acc_test,
             acc_1_valid, pr_valid, rec_valid, fscore_valid, auc_valid, acc_1_test, pr_test, rec_test, fscore_test,
-            auc_test ))
+            auc_test))
 
         print(conf_matrix_valid)
         print('\n')
@@ -297,13 +276,13 @@ def train(class_model, num_epochs, starting_e=0):
 
         writer.add_scalar('Loss', np.mean(losses), epoch)
         writer.add_scalar('AUC/valid', auc_valid, epoch)
-        writer.add_scalar('AUC/test', auc_valid, epoch)
+        writer.add_scalar('AUC/test', auc_test, epoch)
         writer.add_scalar('Fscore/valid', fscore_valid, epoch)
         writer.add_scalar('Fscore/test', fscore_test, epoch)
         writer.add_scalar('Recall/valid', rec_valid, epoch)
         writer.add_scalar('Recall/test', rec_test, epoch)
 
-        if (auc_valid > class_model.best_auc or epoch % 10 == 0) and epoch > 20:
+        if (auc_valid > class_model.best_auc or epoch % 10 == 0) and epoch > 10:
             print("SAVING MODEL")
             class_model.save(epoch)
             class_model.best_auc = auc_valid
@@ -424,7 +403,7 @@ def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
     ens_preds = torch.zeros_like(class_model.calibration_variables[2][0])
 
     start_time = time.time()
-    # data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2019_testwaugm', size=class_model.size,
+    # data_loader, test_data_loader, valid_data_loader = get_dataloader(dname='isic2019_testwaugm', size=class_model.size,
     #                                                                SRV=class_model.SRV,
     #                                                                batch_size=class_model.batch_size,
     #                                                                n_workers=class_model.n_workers,
@@ -465,15 +444,15 @@ def ensemble_aug_eval(n_iter, class_model, with_temp_scal=False):
 def train_temperature_scaling_decoupled(class_model, temp_scal_lr, temp_scal_epochs):
     class_model.n.eval()
 
-    data_loader, test_data_loader, valid_data_loader = get_dataset(dname='isic2020',
-                                                                   dataset_classes=class_model.classes,
-                                                                   size=class_model.size,
-                                                                   SRV=class_model.SRV,
-                                                                   batch_size=class_model.batch_size,
-                                                                   n_workers=class_model.n_workers,
-                                                                   augm_config=class_model.augm_config,
-                                                                   cutout_params=[class_model.cutout_nholes,
-                                                                                  class_model.cutout_pad_size])
+    data_loader, test_data_loader, valid_data_loader = get_dataloader(dname='isic2020',
+                                                                      dataset_classes=class_model.classes,
+                                                                      size=class_model.size,
+                                                                      SRV=class_model.SRV,
+                                                                      batch_size=class_model.batch_size,
+                                                                      n_workers=class_model.n_workers,
+                                                                      augm_config=class_model.augm_config,
+                                                                      cutout_params=[class_model.cutout_nholes,
+                                                                                     class_model.cutout_pad_size])
 
     validation_logit_storage = torch.zeros((len(valid_data_loader.dataset), class_model.num_classes)).float()
     validation_label_storage = torch.zeros((len(valid_data_loader.dataset))).long()
@@ -537,7 +516,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=4, help='number of data loading workers')
     parser.add_argument('--batch_size', type=int, default=16, help='batch size during the training')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
-    parser.add_argument('--loss', default='cross_entropy', choices=['cross_entropy', 'focal'])
+    parser.add_argument('--loss', default='cross_entropy', choices=['cross_entropy', 'focal', 'combo'])
     parser.add_argument('--optimizer', default='SGD', choices=['SGD', 'Adam'])
     parser.add_argument('--scheduler', default='plateau', choices=['plateau', 'None'])
     parser.add_argument('--epochs', type=int, default=150, help='number of epochs to train')
@@ -553,6 +532,7 @@ if __name__ == '__main__':
     parser.add_argument('--calibrated', action='store_true', help='Boolean flag for applying temperature scaling')
     parser.add_argument('--gpu_device', type=int, default=0, help='To select gpu device')
     parser.add_argument('--copy_into_tmp', action='store_true', help='Boolean flag for copying dataset into /tmp')
+    parser.add_argument('--pretrained_isic', action='store_true', help='Pretrained on ISIC2019')
 
     opt = parser.parse_args()
     print(opt)
@@ -563,15 +543,23 @@ if __name__ == '__main__':
                     size=opt.size, batch_size=opt.batch_size, n_workers=opt.workers, pretrained=(not opt.from_scratch),
                     augm_config=opt.augm_config, save_dir=opt.save_dir, mixup_coeff=opt.mixup,
                     cutout_params=[opt.cutout_holes, opt.cutout_pad], total_epochs=opt.epochs, SRV=opt.SRV,
-                    optimize_temp_scal=opt.calibrated, copy_into_tmp=opt.copy_into_tmp)
+                    optimize_temp_scal=opt.calibrated, copy_into_tmp=opt.copy_into_tmp,
+                    pretrained_isic=opt.pretrained_isic)
 
     if not opt.load_epoch == 0:
         n.load(opt.load_epoch)
-        acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, _, _ = eval(n, n.test_data_loader, *n.calibration_variables[2], opt.calibrated)
+        acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, _, _ = eval(n, n.test_data_loader,
+                                                                          *n.calibration_variables[2], opt.calibrated)
         print(f'Acc: {acc} AUC: {auc}')
         print(conf_matrix)
         # # ensemble_aug_eval(100, n)
         # eval(n, n.valid_data_loader, *n.calibration_variables[1])
+    elif opt.pretrained_isic:
+        n.load_pretrained_isic()
+        acc, w_acc, conf_matrix, acc_1, pr, rec, fscore, auc, _, _ = eval(n, n.test_data_loader,
+                                                                          *n.calibration_variables[2], opt.calibrated)
+        print(f'Acc: {acc} AUC: {auc}')
+        print(conf_matrix)
 
     train(n, opt.epochs, opt.load_epoch)
     n.save(opt.epochs)
