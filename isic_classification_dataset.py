@@ -17,6 +17,8 @@ import torch.utils.data as data
 
 from single_file_dataset import Sfd
 
+import config
+
 '''
 STATS
 
@@ -28,11 +30,10 @@ training
 mean: tensor([0.8062, 0.6214, 0.5914]) | std: tensor([0.0826, 0.0964, 0.1085])
 '''
 
-
 class ISIC(data.Dataset):
     """ ISIC Dataset. """
     # data_root="/home/jmaronasm/ISIC_challenge_2019/Task_3/"
-    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC/'
+    data_root = config.data_root
 
     splitsdic = {
         'training_v1_2020': data_root + "2k20_train_partition.csv",
@@ -149,8 +150,9 @@ class ISIC(data.Dataset):
         return split_list, labels_list
 
     def perform_copy_into_tmp(self):
-        dataset_path_tmp = '/tmp/sallegretti_dataset_' + self.dataset_filename
-        finished_path = '/tmp/sallegretti_dataset_' + self.dataset_filename + '.finished'
+        prefix = config.tmp_prefix
+        dataset_path_tmp = '/tmp/' + prefix + self.dataset_filename
+        finished_path = '/tmp/' + prefix + self.dataset_filename + '.finished'
 
         # atomically create tmp file if it does not exists
         try:

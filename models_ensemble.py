@@ -16,6 +16,7 @@ import csv
 from classification_net import ClassifyNet, eval, ensemble_aug_eval
 from utils import ConfusionMatrix, compute_calibration_measures
 
+import config
 
 def make_submission_csv(file_name, img_names, preds):
     with open(file_name, 'w') as csvfile:
@@ -75,7 +76,7 @@ if __name__ == '__main__':
                             help='mixout coefficient. If 0 is provided no mixup is applied')
     net_parser.add_argument('--pretrained_isic', action='store_true', help='Pretrained on ISIC2019')
 
-    output_path = '/nas/softechict-nas-1/sallegretti/isic_submission_output'
+    output_path = config.ensemble_output_path
     avgname = os.path.basename(opt.avg)
     fname = opt.dataset + "_" + os.path.splitext(avgname)[0]
     if opt.calibrated:
@@ -151,7 +152,6 @@ if __name__ == '__main__':
                 ens_preds += preds
         except Exception as e:
             print(f'Exception {e}')
-
 
     conf_matrix_test = ConfusionMatrix(n.num_classes)
     temp_ens_preds = ens_preds / counter

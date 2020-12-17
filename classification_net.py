@@ -26,6 +26,8 @@ from utils_metrics import compute_accuracy_metrics
 
 from torch.utils.tensorboard import SummaryWriter
 
+import config
+
 
 class ClassifyNet:
     def __init__(self, net, dname, dropout, l_r, loss, optimizer, scheduler, size, batch_size, n_workers, augm_config,
@@ -88,7 +90,7 @@ class ClassifyNet:
         self.optimizer = get_optimizer(self.n, self.learning_rate, self.optname)
         self.scheduler = get_scheduler(self.optimizer, self.schedname)
 
-        # to measures calibration stuff
+        # to measure calibration stuff
         predictions_train = torch.zeros(len(self.data_loader.dataset), self.num_classes).float()
         labels_train = torch.zeros(len(self.data_loader.dataset), ).long()
         predictions_valid = torch.zeros(len(self.valid_data_loader.dataset), self.num_classes).float()
@@ -158,7 +160,7 @@ class ClassifyNet:
                                     self.get_model_filename(n_epoch) + '_temperature.scaling.decoupled_opt.pth'))
             print("model weights and temp scal T successfully saved")
         except Exception:
-            print("Error during Saving")
+            print("Error during saving")
 
     def load(self, n_epoch=0):
         if self.optimize_temp_scal:
@@ -220,7 +222,7 @@ class ClassifyNet:
 
 
 def train(class_model, num_epochs, starting_e=0):
-    tensorboard_root = '/nas/softechict-nas-1/sallegretti/tensorboard'
+    tensorboard_root = config.tensorboard_root
     tensorboard_path = os.path.join(tensorboard_root, class_model.get_model_filename())
 
     Path(tensorboard_path).mkdir(parents=True, exist_ok=True)

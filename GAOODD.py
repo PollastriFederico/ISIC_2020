@@ -6,7 +6,7 @@ import os
 import numpy as np
 from classification_net import ClassifyNet, eval, ensemble_aug_eval
 from model import MLP_G, MLP_D, GradientPenalty
-from data import get_dataset
+from data import get_dataloader
 
 from utils import categorical_to_one_hot
 
@@ -47,7 +47,7 @@ class GAOODN:
         self.optimizerD = torch.optim.Adam(self.netD.parameters(), lr=self.l_r, betas=(0.5, 0.9))
         self.optimizerG = torch.optim.Adam(self.netG.parameters(), lr=self.l_r, betas=(0.5, 0.9))
 
-        self.ood_training_dataloader, self.ood_test_dataloader, self.ood_valid_dataloader = get_dataset(
+        self.ood_training_dataloader, self.ood_test_dataloader, self.ood_valid_dataloader = get_dataloader(
             dname='isic2019', size=opt.size, dataset_classes=opt.ood_classes, SRV=True,
             batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
             cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)
@@ -57,7 +57,7 @@ class GAOODN:
         self.true_ood_valid_dataloader = None
 
         if opt.true_ood_classes:
-            self.true_ood_training_dataloader, self.true_ood_test_dataloader, self.true_ood_valid_dataloader = get_dataset(
+            self.true_ood_training_dataloader, self.true_ood_test_dataloader, self.true_ood_valid_dataloader = get_dataloader(
                 dname='isic2019', size=opt.size, dataset_classes=opt.true_ood_classes, SRV=True,
                 batch_size=opt.batch_size, n_workers=opt.workers, augm_config=opt.augm_config,
                 cutout_params=[opt.cutout_holes, opt.cutout_pad], drop_last_flag=True)

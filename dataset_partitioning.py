@@ -1,9 +1,8 @@
 import csv
 import random
+import config
 
 # data_root="/home/jmaronasm/ISIC_challenge_2019/Task_3/"
-data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC/'
-
 
 def find_img_label(row):
     return int(row[7])
@@ -14,7 +13,7 @@ def split_dataset(test_class_samples=[1000, 2250, 750, 200, 500, 75, 75, 150]):
     alist = []
     for i in range(8):
         alist.append([])
-    with open(data_root + "ISIC_2019_Training_GroundTruth.csv") as csvfile:
+    with open(config.data_root + "ISIC_2019_Training_GroundTruth.csv") as csvfile:
         readCSV = csv.reader(csvfile, delimiter=',')
         for row in readCSV:
             if row[0] == 'image':
@@ -49,7 +48,7 @@ def split_dataset_wvalidation(test_class_samples=[1000, 2250, 750, 200, 500, 75,
     alist = []
     for i in range(2):
         alist.append([])
-    with open(data_root + "train.csv") as csvfile:
+    with open(config.data_root + "train.csv") as csvfile:
         readCSV = csv.reader(csvfile, delimiter=',')
         for row in readCSV:
             if row[0] == 'image_name':

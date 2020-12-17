@@ -15,6 +15,7 @@ from yaml import CLoader as Loader
 from torch.utils import data
 import csv
 import imgaug as ia
+import config
 
 
 # Single File Dataset (.sfd) format
@@ -204,7 +205,7 @@ class ResizeSquaredTransform:
 
 
 def create_isic2020_sfd(prefix='', transform=None):
-    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+    data_root = config.data_root
 
     csv_dict = {
         '2k20_validation_partition.csv': 'val.sfd',
@@ -229,7 +230,7 @@ def create_isic2020_sfd(prefix='', transform=None):
 
 
 def create_isic2020_sfd_splits(prefix='', transform=None):
-    data_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+    data_root = config.data_root
 
     csv_dict = {
         '2k20_validation_partition_5.csv': 'val_5.sfd',
@@ -266,7 +267,7 @@ if __name__ == '__main__':
 
     create_isic2020_sfd_splits()
 
-    img_root = '/nas/softechict-nas-1/sallegretti/data/ISIC/SIIM-ISIC'
+    img_root = config.data_root
     #
     sfd = Sfd(os.path.join(img_root, 'train_6.sfd'))
     img = sfd[0]
